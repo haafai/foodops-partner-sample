@@ -16,7 +16,8 @@ export function ModifierPicker({ item, onAdd }: { item: PartnerMenuItem; onAdd(l
 
   function change(modifierId: string, delta: number) {
     setSelection((current) => {
-      const next = Math.max(0, quantityOf(modifierId) + delta);
+      // Read the quantity from `current`, not from render-time state, so two quick clicks count twice.
+      const next = Math.max(0, (current.find((s) => s.modifierId === modifierId)?.quantity ?? 0) + delta);
       const others = current.filter((s) => s.modifierId !== modifierId);
       return next === 0 ? others : [...others, { modifierId, quantity: next }];
     });

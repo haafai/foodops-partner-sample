@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { PartnerClient } from '@foodops-partner/client';
 import { detectMode } from './mode';
 import type { Mode } from './mode';
@@ -37,10 +38,13 @@ export function SessionProvider({ children, initial }: { children: ReactNode; in
     return () => { cancelled = true; };
   }, [initial?.mode, settings]);
 
+  const queryClient = useQueryClient();
   const update = useCallback((next: Settings) => {
     saveSettings(next);
     setSettings(next);
-  }, []);
+    // Outlets, menus and orders belong to the old server or key: drop them all.
+    queryClient.clear();
+  }, [queryClient]);
 
   const value = useMemo<SessionValue>(() => ({ settings, mode, client, update }), [settings, mode, client, update]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

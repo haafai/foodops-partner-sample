@@ -54,6 +54,32 @@ describe('CheckoutPage', () => {
     expect(screen.getByTestId('idempotency-key').textContent).not.toBe(before);
   });
 
+  it('after a failure, editing the request turns the retry button back into "Place order" with a new key', async () => {
+    const user = userEvent.setup();
+    const createOrder = vi.fn().mockRejectedValueOnce(new PartnerApiError({ status: 503, code: 'auth_unavailable', message: 'down' }));
+    renderCheckout(createOrder);
+    const failedKey = screen.getByTestId('idempotency-key').textContent;
+    await user.click(screen.getByRole('button', { name: /place order/i }));
+    expect(await screen.findByRole('button', { name: /try again with the same key/i })).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/order notes/i), 'no onions');
+    expect(screen.getByRole('button', { name: 'Place order' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /try again with the same key/i })).toBeNull();
+    expect(screen.getByTestId('idempotency-key').textContent).not.toBe(failedKey);
+  });
+
+  it('disables the form while the order is being placed', async () => {
+    const user = userEvent.setup();
+    let resolve!: (value: typeof created) => void;
+    const createOrder = vi.fn(() => new Promise<typeof created>((r) => { resolve = r; }));
+    renderCheckout(createOrder);
+    await user.click(screen.getByRole('button', { name: /place order/i }));
+    expect(await screen.findByRole('button', { name: /placing/i })).toBeDisabled();
+    expect(screen.getByLabelText(/customer name/i)).toBeDisabled();
+    expect(screen.getByLabelText(/order notes/i)).toBeDisabled();
+    resolve(created);
+    expect(await screen.findByText('Tracking order-1')).toBeInTheDocument();
+  });
+
   it('offers the existing order on duplicate_order', async () => {
     const user = userEvent.setup();
     const createOrder = vi.fn().mockRejectedValueOnce(new PartnerApiError({ status: 409, code: 'duplicate_order', message: 'dup', details: { orderId: 'order-1' } }));

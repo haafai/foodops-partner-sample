@@ -2,8 +2,33 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { lineFromSelection } from '../src/cart/cart';
+import { useCart } from '../src/cart/CartProvider';
 import { SetupPage } from '../src/pages/SetupPage';
+import { CLASSIC } from './menu-fixture';
 import { renderWithProviders } from './render';
+
+/** Seeds one cached query, as if outlets had been loaded from the old server. */
+function SeedQuery() {
+  const queryClient = useQueryClient();
+  useState(() => queryClient.setQueryData(['outlets', 'old-server'], [{ outletId: 'old' }]));
+  return null;
+}
+
+/** Prints what survived the save: the cart's line count and the number of cached queries. */
+function Probe() {
+  const cart = useCart();
+  const queryClient = useQueryClient();
+  return (
+    <div>
+      <h1>Outlets here</h1>
+      <p data-testid="cart-lines">{cart.lines.length}</p>
+      <p data-testid="cached-queries">{queryClient.getQueryCache().getAll().length}</p>
+    </div>
+  );
+}
 
 function renderSetup() {
   return renderWithProviders(
@@ -36,5 +61,24 @@ describe('SetupPage', () => {
     expect(await screen.findByText('Outlets here')).toBeInTheDocument();
     expect(sessionStorage.getItem('partner-demo.apiKey')).toBe('hbk_test_mockfull0001_fullscopes');
     expect(localStorage.getItem('partner-demo.baseUrl')).toBe('http://127.0.0.1:4010');
+  });
+
+  it('empties the cart and the query cache when the settings are saved', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <Routes>
+        <Route path="/setup" element={<><SeedQuery /><SetupPage /></>} />
+        <Route path="/outlets" element={<Probe />} />
+      </Routes>,
+      {
+        route: '/setup', client: null, settings: { baseUrl: 'http://127.0.0.1:4010', apiKey: '' },
+        cart: { outlet: { outletId: 'o-marine', name: 'Marine Drive' }, lines: [lineFromSelection(CLASSIC, CLASSIC.variants[0], [], 2, '')] },
+      },
+    );
+    await user.type(screen.getByLabelText(/api key/i), 'hbk_test_mockfull0001_fullscopes');
+    await user.click(screen.getByRole('button', { name: /save/i }));
+    expect(await screen.findByText('Outlets here')).toBeInTheDocument();
+    expect(screen.getByTestId('cart-lines')).toHaveTextContent('0');
+    expect(screen.getByTestId('cached-queries')).toHaveTextContent('0');
   });
 });

@@ -10,7 +10,7 @@ export function errorLine(error: PartnerApiError): string {
     case 'duplicate_order': return 'This reference was already used at this restaurant today. Open the existing order.';
     case 'invalid_line': return `Line ${Number(error.details?.line ?? 0) + 1}: ${String(error.details?.reason ?? error.message)}. Refresh the menu and try again.`;
     case 'cannot_cancel': return 'The kitchen has started this order. Call the restaurant.';
-    case 'idempotency_conflict': return 'This retry key was used with a different order. Start a new checkout.';
+    case 'idempotency_conflict': return 'This retry key was already used with a different request. Retry with a new key.';
     case 'rate_limited': return `Slow down; retrying in ${error.retryAfterSeconds ?? 5} seconds.`;
     default: return SETUP_CODES.has(error.code) ? `Setup problem: ${error.code}. Check the key and contact the restaurant.` : error.message;
   }

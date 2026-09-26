@@ -9,7 +9,7 @@ const cases: Array<[number, string, Record<string, unknown> | undefined, RegExp]
   [409, 'duplicate_order', { orderId: 'x' }, /already used at this restaurant today/],
   [422, 'invalid_line', { line: 1, reason: 'variant unavailable' }, /Line 2: variant unavailable/],
   [409, 'cannot_cancel', undefined, /kitchen has started/],
-  [409, 'idempotency_conflict', undefined, /retry key was used with a different order/],
+  [409, 'idempotency_conflict', undefined, /This retry key was already used with a different request\. Retry with a new key\./],
   [429, 'rate_limited', undefined, /retrying in 7 seconds/],
   [401, 'invalid_api_key', undefined, /Setup problem: invalid_api_key/],
   [403, 'partner_key_required', undefined, /Setup problem: partner_key_required/],

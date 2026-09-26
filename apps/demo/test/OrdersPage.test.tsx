@@ -5,6 +5,7 @@ import type { PartnerOrder } from '@foodops-partner/client';
 import { listTracked, saveTracked } from '../src/orders/orderStore';
 import type { TrackedOrder } from '../src/orders/orderStore';
 import { OrdersPage } from '../src/pages/OrdersPage';
+import { BOARD_POLL_MS } from '../src/orders/polling';
 import { fakeClient, renderWithProviders } from './render';
 
 const tracked = (id: string, lastStatus: TrackedOrder['lastStatus']): TrackedOrder => ({
@@ -43,6 +44,26 @@ describe('OrdersPage', () => {
     renderWithProviders(<OrdersPage />, { client: fakeClient({ getOrder }), route: '/orders' });
     expect(await screen.findByText(/not visible with this key/i)).toBeInTheDocument();
     expect((await screen.findByText('SO-here')).closest('tr')).toHaveTextContent('ready');
+  });
+
+  it('stops polling a row whose query errored, and keeps polling the others', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      saveTracked(tracked('gone', 'pending'));
+      saveTracked(tracked('here', 'pending'));
+      const getOrder = vi.fn(async (id: string) => {
+        if (id === 'gone') throw new PartnerApiError({ status: 404, code: 'not_found', message: 'no' });
+        return live(id, 'accepted');
+      });
+      renderWithProviders(<OrdersPage />, { client: fakeClient({ getOrder }), route: '/orders' });
+      expect(await screen.findByText(/not visible with this key/i)).toBeInTheDocument();
+      await waitFor(() => expect(getOrder.mock.calls.filter(([id]) => id === 'here')).toHaveLength(1));
+      await vi.advanceTimersByTimeAsync(BOARD_POLL_MS * 2 + 100);
+      await waitFor(() => expect(getOrder.mock.calls.filter(([id]) => id === 'here').length).toBeGreaterThanOrEqual(3));
+      expect(getOrder.mock.calls.filter(([id]) => id === 'gone')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('writes a status reached only on the board back into the store, so polling stops', async () => {

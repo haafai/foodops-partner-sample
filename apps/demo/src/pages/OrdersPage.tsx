@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
+import type { Query } from '@tanstack/react-query';
 import { Link, Navigate } from 'react-router-dom';
 import { PartnerApiError, isTerminal } from '@foodops-partner/client';
+import type { PartnerOrder } from '@foodops-partner/client';
 import { errorLine } from '../errors/errorText';
 import { useSession } from '../config/SessionProvider';
 import { listTracked, updateTracked } from '../orders/orderStore';
@@ -16,7 +18,8 @@ export function OrdersPage() {
       queryKey: ['order', order.id],
       queryFn: () => client!.getOrder(order.id),
       enabled: client !== null && !isTerminal(order.lastStatus),
-      refetchInterval: BOARD_POLL_MS,
+      // A row that errored (a 404 for another key's order, say) stops polling instead of failing every 15 s.
+      refetchInterval: (q: Query<PartnerOrder>) => (q.state.error ? false : BOARD_POLL_MS),
       retry: false,
     })),
   });

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { redactKey } from '@foodops-partner/client';
+import { useCart } from '../cart/CartProvider';
 import { useSession } from '../config/SessionProvider';
 import { normaliseBaseUrl, validateSettings } from '../config/settings';
 
 export function SetupPage() {
   const { settings, update } = useSession();
   const navigate = useNavigate();
+  const cart = useCart();
   const [baseUrl, setBaseUrl] = useState(settings.baseUrl);
   const [apiKey, setApiKey] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
@@ -19,6 +21,8 @@ export function SetupPage() {
     setProblem(message);
     if (message) return;
     update(next);
+    // A cart holds another server's variant ids: it cannot follow the user to a new base URL or key.
+    cart.clear();
     navigate('/outlets');
   }
 

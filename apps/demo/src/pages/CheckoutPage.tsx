@@ -19,6 +19,8 @@ export function CheckoutPage() {
   const [form, setForm] = useState<CheckoutForm>(() => ({ partnerReference: newPartnerReference(), customerName: '', customerPhone: '', notes: '', expectedPickupAt: '' }));
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  /** The fingerprint of the request that just failed: only that exact request may be retried with its key. */
+  const [failedFingerprint, setFailedFingerprint] = useState<string | null>(null);
 
   const outletId = cart.outletId ?? '';
   const request = toCreateRequest(outletId, cart.lines, form);
@@ -38,6 +40,7 @@ export function CheckoutPage() {
     if (busy || !client) return;
     setBusy(true);
     setError(null);
+    setFailedFingerprint(null);
     // The key for THIS request: unchanged since the last attempt ⇒ the same key, so the server replays instead of duplicating.
     const active = keyed.fingerprint === fingerprint ? keyed : keyFor(keyed, fingerprint);
     if (active !== keyed) setKeyed(active);
@@ -53,6 +56,7 @@ export function CheckoutPage() {
       navigate(`/orders/${created.id}`);
     } catch (e) {
       setError(e);
+      setFailedFingerprint(active.fingerprint);
     } finally {
       setBusy(false);
     }
@@ -62,38 +66,43 @@ export function CheckoutPage() {
 
   return (
     <form onSubmit={submit} className="mx-auto grid max-w-3xl gap-4 p-4 md:grid-cols-2">
-      <section className="space-y-3">
-        <h1 className="text-xl font-semibold">Checkout · {cart.outletName}</h1>
-        <label className="block text-sm"><span className="font-medium">Your reference</span>
-          <input className="mt-1 w-full rounded border px-2 py-1" value={form.partnerReference} onChange={field('partnerReference')} maxLength={64} /></label>
-        <label className="block text-sm"><span className="font-medium">Customer name</span>
-          <input className="mt-1 w-full rounded border px-2 py-1" value={form.customerName} onChange={field('customerName')} maxLength={100} /></label>
-        <label className="block text-sm"><span className="font-medium">Customer phone</span>
-          <input className="mt-1 w-full rounded border px-2 py-1" value={form.customerPhone} onChange={field('customerPhone')} maxLength={32} /></label>
-        <label className="block text-sm"><span className="font-medium">Order notes</span>
-          <textarea className="mt-1 w-full rounded border px-2 py-1" value={form.notes} onChange={field('notes')} maxLength={500} /></label>
-        <label className="block text-sm"><span className="font-medium">Pickup time (optional)</span>
-          <input type="datetime-local" className="mt-1 w-full rounded border px-2 py-1" value={form.expectedPickupAt} onChange={field('expectedPickupAt')} /></label>
-      </section>
-      <section className="space-y-3">
-        <h2 className="font-semibold">Order</h2>
-        <ul className="space-y-1 text-sm">
-          {cart.lines.map((line) => (
-            <li key={line.lineId} className="flex justify-between"><span>{line.quantity} × {line.itemName} ({line.variantName})</span><span>{lineTotal(line).toFixed(2)}</span></li>
-          ))}
-        </ul>
-        <p className="flex justify-between border-t pt-2 text-sm font-medium"><span>Estimate, sent as partnerTotal</span><span>{estimateTotal(cart.lines).toFixed(2)}</span></p>
-        <div className="rounded border bg-slate-100 p-3 text-xs text-slate-700">
-          <p className="font-medium">Retry key</p>
-          <p className="break-all font-mono" data-testid="idempotency-key">{keyed.key}</p>
-          <p className="mt-1">Minted when this checkout opened. Change anything above and a new one appears. A retry after a failure sends this same key, so the restaurant replays the order instead of making a second one.</p>
-        </div>
-        <ErrorNotice error={error} />
-        {duplicateId && <Link to={`/orders/${duplicateId}`} className="block text-sm underline">Open the existing order</Link>}
-        <button type="submit" disabled={busy} className="w-full rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-          {busy ? 'Placing…' : error ? 'Try again with the same key' : 'Place order'}
-        </button>
-      </section>
+      {/* Disabled while the order is in flight: an edit mid-request would change the key under a live attempt. */}
+      <fieldset disabled={busy} className="min-w-0">
+        <section className="space-y-3">
+          <h1 className="text-xl font-semibold">Checkout · {cart.outletName}</h1>
+          <label className="block text-sm"><span className="font-medium">Your reference</span>
+            <input className="mt-1 w-full rounded border px-2 py-1" value={form.partnerReference} onChange={field('partnerReference')} maxLength={64} /></label>
+          <label className="block text-sm"><span className="font-medium">Customer name</span>
+            <input className="mt-1 w-full rounded border px-2 py-1" value={form.customerName} onChange={field('customerName')} maxLength={100} /></label>
+          <label className="block text-sm"><span className="font-medium">Customer phone</span>
+            <input className="mt-1 w-full rounded border px-2 py-1" value={form.customerPhone} onChange={field('customerPhone')} maxLength={32} /></label>
+          <label className="block text-sm"><span className="font-medium">Order notes</span>
+            <textarea className="mt-1 w-full rounded border px-2 py-1" value={form.notes} onChange={field('notes')} maxLength={500} /></label>
+          <label className="block text-sm"><span className="font-medium">Pickup time (optional)</span>
+            <input type="datetime-local" className="mt-1 w-full rounded border px-2 py-1" value={form.expectedPickupAt} onChange={field('expectedPickupAt')} /></label>
+        </section>
+      </fieldset>
+      <fieldset disabled={busy} className="min-w-0">
+        <section className="space-y-3">
+          <h2 className="font-semibold">Order</h2>
+          <ul className="space-y-1 text-sm">
+            {cart.lines.map((line) => (
+              <li key={line.lineId} className="flex justify-between"><span>{line.quantity} × {line.itemName} ({line.variantName})</span><span>{lineTotal(line).toFixed(2)}</span></li>
+            ))}
+          </ul>
+          <p className="flex justify-between border-t pt-2 text-sm font-medium"><span>Estimate, sent as partnerTotal</span><span>{estimateTotal(cart.lines).toFixed(2)}</span></p>
+          <div className="rounded border bg-slate-100 p-3 text-xs text-slate-700">
+            <p className="font-medium">Retry key</p>
+            <p className="break-all font-mono" data-testid="idempotency-key">{keyed.key}</p>
+            <p className="mt-1">Minted when this checkout opened. Change anything above and a new one appears. A retry after a failure sends this same key, so the restaurant replays the order instead of making a second one.</p>
+          </div>
+          <ErrorNotice error={error} />
+          {duplicateId && <Link to={`/orders/${duplicateId}`} className="block text-sm underline">Open the existing order</Link>}
+          <button type="submit" disabled={busy} className="w-full rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+            {busy ? 'Placing…' : failedFingerprint === fingerprint ? 'Try again with the same key' : 'Place order'}
+          </button>
+        </section>
+      </fieldset>
     </form>
   );
 }
