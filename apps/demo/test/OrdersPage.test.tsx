@@ -1,8 +1,8 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PartnerApiError } from '@foodops-partner/client';
 import type { PartnerOrder } from '@foodops-partner/client';
-import { saveTracked } from '../src/orders/orderStore';
+import { listTracked, saveTracked } from '../src/orders/orderStore';
 import type { TrackedOrder } from '../src/orders/orderStore';
 import { OrdersPage } from '../src/pages/OrdersPage';
 import { fakeClient, renderWithProviders } from './render';
@@ -43,6 +43,16 @@ describe('OrdersPage', () => {
     renderWithProviders(<OrdersPage />, { client: fakeClient({ getOrder }), route: '/orders' });
     expect(await screen.findByText(/not visible with this key/i)).toBeInTheDocument();
     expect((await screen.findByText('SO-here')).closest('tr')).toHaveTextContent('ready');
+  });
+
+  it('writes a status reached only on the board back into the store, so polling stops', async () => {
+    saveTracked(tracked('open', 'pending'));
+    const getOrder = vi.fn(async () => live('open', 'picked_up'));
+    renderWithProviders(<OrdersPage />, { client: fakeClient({ getOrder }), route: '/orders' });
+    const openRow = (await screen.findByText('SO-open')).closest('tr')!;
+    expect(await screen.findByText('picked_up')).toBeInTheDocument();
+    expect(openRow).toHaveTextContent('picked_up');
+    await waitFor(() => expect(listTracked().find((o) => o.id === 'open')?.lastStatus).toBe('picked_up'));
   });
 
   it('has an empty state', () => {

@@ -17,13 +17,15 @@ export function SimulatorPanel({ orderId, status }: { orderId: string; status: P
   const [autopilot, setAutopilot] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  async function act(action: () => Promise<unknown>) {
+  async function act(action: () => Promise<unknown>): Promise<boolean> {
     setProblem(null);
     try {
       await action();
       await queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+      return true;
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
+      return false;
     }
   }
   const rejectReason = reason === 'Other' ? other.trim() || 'Other' : reason;
@@ -47,7 +49,10 @@ export function SimulatorPanel({ orderId, status }: { orderId: string; status: P
         <button type="button" className={button} disabled={status !== 'pending'} onClick={() => act(() => mock.reject(orderId, rejectReason))}>Reject</button>
       </div>
       <label className="mt-2 block">
-        <input type="checkbox" checked={autopilot} onChange={(e) => { setAutopilot(e.target.checked); void act(() => mock.setAutopilot(e.target.checked, 5)); }} />{' '}
+        <input type="checkbox" checked={autopilot} onChange={(e) => {
+          const next = e.target.checked;
+          void act(() => mock.setAutopilot(next, 5)).then((ok) => { if (ok) setAutopilot(next); });
+        }} />{' '}
         Autopilot: accept new orders after 5 s and advance every 5 s
       </label>
       <p className="mt-1 text-xs text-slate-600">{canCancel(status) ? 'The partner may still cancel.' : 'Past the point of partner cancellation.'}</p>

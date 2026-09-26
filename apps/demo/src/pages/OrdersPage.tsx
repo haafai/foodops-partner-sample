@@ -1,14 +1,16 @@
+import { useEffect, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { Link, Navigate } from 'react-router-dom';
 import { PartnerApiError, isTerminal } from '@foodops-partner/client';
 import { errorLine } from '../errors/errorText';
 import { useSession } from '../config/SessionProvider';
-import { listTracked } from '../orders/orderStore';
+import { listTracked, updateTracked } from '../orders/orderStore';
 import { BOARD_POLL_MS } from '../orders/polling';
 
 export function OrdersPage() {
   const { client } = useSession();
   const tracked = listTracked();
+  const [, bump] = useState(0);
   const queries = useQueries({
     queries: tracked.map((order) => ({
       queryKey: ['order', order.id],
@@ -18,6 +20,20 @@ export function OrdersPage() {
       retry: false,
     })),
   });
+  // The board's own `enabled` gate reads `lastStatus` from the store, so a terminal status
+  // reached only here (never opened on OrderPage) must be written back or polling never stops.
+  const signature = queries.map((q) => q.data?.status ?? '').join(',');
+  useEffect(() => {
+    let changed = false;
+    queries.forEach((query, i) => {
+      const order = tracked[i];
+      if (order && query.data && query.data.status !== order.lastStatus) {
+        updateTracked(order.id, { lastStatus: query.data.status });
+        changed = true;
+      }
+    });
+    if (changed) bump((n) => n + 1);
+  }, [signature, queries, tracked]);
   if (!client) return <Navigate to="/setup" replace />;
   if (tracked.length === 0) return <p className="p-4 text-sm text-slate-600">No orders placed from this browser yet.</p>;
   return (
