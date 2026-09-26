@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { CreatePartnerOrderRequest } from '@foodops-partner/client';
 import {
   FULL_KEY, GROUP_EXTRAS, MENU_ONLY_KEY, MOD_CHEESE, MOD_DIP_GARLIC, MOD_EGG, MOD_BACON, OUTLET_LAGOON_KIOSK, OUTLET_MARINE_DRIVE,
-  UNBOUND_KEY, VARIANT_CHICKEN_REGULAR, VARIANT_CLASSIC_REGULAR, VARIANT_FISH_DOUBLE, VARIANT_FRIES_REGULAR,
+  SECOND_FULL_KEY, UNBOUND_KEY, VARIANT_CHICKEN_REGULAR, VARIANT_CLASSIC_REGULAR, VARIANT_FISH_DOUBLE, VARIANT_FRIES_REGULAR,
 } from '../src/fixtures';
 import { startMockServer } from '../src/server';
 import type { MockServerHandle } from '../src/server';
@@ -156,9 +156,29 @@ describe('POST orders: idempotency', () => {
     expect((await create(request(), key)).status).toBe(201);
   });
 
-  it('keys are partitioned per API key id: the replay of one key never answers another', async () => {
+  it('an order is invisible to a second full-access key, and stays visible to the key that created it', async () => {
+    const created = (await create(request())).json;
+    expect((await call(handle, 'GET', `${P}/orders/${created.id}`, { key: SECOND_FULL_KEY })).status).toBe(404);
+    expect((await call(handle, 'GET', `${P}/orders/${created.id}`)).status).toBe(200);
+  });
+
+  it('the same Idempotency-Key and body from a second full-access key creates its own order, not a replay', async () => {
     const key = idem();
-    await create(request(), key);
-    expect((await create(request(), key, MENU_ONLY_KEY)).json.error).toBe('insufficient_scope');
+    const body = request();
+    const a = await create(body, key);
+    const b = await create(body, key, SECOND_FULL_KEY);
+    expect(a.status).toBe(201);
+    expect(b.status).toBe(201);
+    expect(b.json.id).not.toBe(a.json.id);
+    expect(handle.state.orders.size).toBe(2);
+  });
+
+  it('the duplicate-reference rule is scoped per key: a second full-access key may reuse the same reference', async () => {
+    const partnerReference = 'PX-CROSS-KEY';
+    const first = await create(request({ partnerReference }));
+    expect(first.status).toBe(201);
+    const second = await create(request({ partnerReference }), idem(), SECOND_FULL_KEY);
+    expect(second.status).toBe(201);
+    expect(second.json.error).toBeUndefined();
   });
 });
