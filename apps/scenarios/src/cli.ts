@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { parseArgs } from 'node:util';
 import { redactKey } from '@foodops-partner/client';
 import { createContext } from './context';
@@ -11,10 +12,12 @@ const USAGE = `partner-scenarios --base-url <url> --key <hbk_…> [--only a,b] [
 Runs every scenario against the API at --base-url. Scenarios that need the mock's
 restaurant simulator, a closed outlet, or an extra key are skipped unless the target
 provides them. Base URL and key also come from PARTNER_API_BASE_URL / PARTNER_API_KEY
-(a .env file in the current directory is read).`;
+(a .env file in the directory you ran npm from, or the current directory, is read).`;
 
+// `npm run scenarios` runs this script inside apps/scenarios; INIT_CWD is where npm was invoked (the repo root).
+const envDir = process.env.INIT_CWD ?? process.cwd();
 try {
-  process.loadEnvFile();
+  process.loadEnvFile(path.join(envDir, '.env'));
 } catch {
   // No .env file: flags or exported variables must supply the values.
 }
