@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import type { PartnerClient } from '@foodops-partner/client';
+import { CartProvider } from '../src/cart/CartProvider';
 import { SessionProvider } from '../src/config/SessionProvider';
 import type { Mode } from '../src/config/mode';
 import type { Settings } from '../src/config/settings';
@@ -34,7 +35,9 @@ export function renderWithProviders(ui: ReactNode, options: RenderOptions = {}) 
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[options.route ?? '/']}>
-        <SessionProvider initial={{ settings: options.settings ?? TEST_SETTINGS, mode: options.mode ?? 'mock', client }}>{ui}</SessionProvider>
+        <SessionProvider initial={{ settings: options.settings ?? TEST_SETTINGS, mode: options.mode ?? 'mock', client }}>
+          <CartProvider>{ui}</CartProvider>
+        </SessionProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
