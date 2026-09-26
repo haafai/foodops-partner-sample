@@ -1,0 +1,10 @@
+{
+  "name": "@foodops-partner/client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A dependency-free TypeScript client for the FoodOps delivery partner API.",
+  "exports": { ".": "./src/index.ts" },
+  "types": "./src/index.ts",
+  "scripts": { "typecheck": "tsc --noEmit -p tsconfig.json" }
+}

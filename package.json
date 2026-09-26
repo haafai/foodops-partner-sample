@@ -1,0 +1,29 @@
+{
+  "name": "foodops-partner-sample",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sample integration for the FoodOps delivery partner API: a TypeScript client, a contract mock, a demo ordering app and a scenario runner.",
+  "workspaces": ["packages/*", "apps/*"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "npm run dev -w @foodops-partner/demo",
+    "mock": "npm run start -w @foodops-partner/mock-server",
+    "scenarios": "npm run start -w @foodops-partner/scenarios --",
+    "ci:scenarios": "node scripts/ci-scenarios.mjs",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.33.0",
+    "@types/node": "^24.3.0",
+    "eslint": "^9.33.0",
+    "globals": "^16.3.0",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.39.1",
+    "vitest": "^3.2.4"
+  }
+}
