@@ -5,6 +5,7 @@ import { handleControl } from './control';
 import type { MockKey, Scope } from './fixtures';
 import { error, headerValue, readJson, send, text } from './http';
 import type { JsonResponse } from './http';
+import { handlePartnerCancel, scheduleAutopilot } from './lifecycle';
 import { handleGetMenu } from './menu';
 import { handleCreateOrder, handleGetOrder } from './orders';
 import { handleListOutlets } from './outlets';
@@ -50,6 +51,14 @@ export const routes: Route[] = [
     },
   },
   { method: 'GET', pattern: /^orders\/([^/]+)$/, scope: 'orders.write', handle: ({ state, key }, m) => handleGetOrder(state, key, decodeURIComponent(m[1])) },
+  {
+    method: 'POST', pattern: /^orders\/([^/]+)\/cancel$/, scope: 'orders.write',
+    handle: async ({ state, key, req, body }, m) => {
+      const idempotencyKey = requireIdempotencyKey(req);
+      if (typeof idempotencyKey !== 'string') return idempotencyKey;
+      return handlePartnerCancel(state, key, decodeURIComponent(m[1]), await body(), idempotencyKey);
+    },
+  },
 ];
 
 function faultResponse(fault: FaultResponse): JsonResponse {
@@ -114,6 +123,7 @@ export interface MockServerHandle { url: string; port: number; state: MockState;
 /** Port 0 (the default) picks a free port, which is what tests want. `npm run mock` passes 4010. */
 export async function startMockServer(options: MockServerOptions = {}): Promise<MockServerHandle> {
   const state = new MockState({ clock: options.clock, scheduler: options.scheduler ?? realScheduler });
+  state.onOrderCreated = (orderId) => scheduleAutopilot(state, orderId);
   const server = createServer(createRequestHandler(state));
   const host = options.host ?? '127.0.0.1';
   await new Promise<void>((resolve, reject) => {
