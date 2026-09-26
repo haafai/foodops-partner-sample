@@ -46,7 +46,9 @@ Request limits: `partnerReference` 1–64 characters; `lines` 1–100; `quantity
 
 `pending` → `accepted` → `preparing` → `ready` → `picked_up`, or `rejected` (from pending; `reason` is the
 restaurant's, `timeout` when it never answered), or `cancelled` (`cancelledBy` is `partner` or `restaurant`).
-Terminal: `picked_up`, `rejected`, `cancelled`. The partner may cancel while `pending` or `accepted`.
+Terminal: `picked_up`, `rejected`, `cancelled`. The partner may cancel while `pending` or `accepted`; a
+partner-initiated cancel's `reason` is returned prefixed `Partner: ` (sent `customer left`, read back
+`Partner: customer left`).
 
 ## Errors
 

@@ -18,6 +18,11 @@ Each restaurant issues you **one key** for that restaurant. It looks like `hbk_t
   `403 insufficient_scope`; a key that is not bound to a delivery partner answers `403 partner_key_required`.
   All three mean "stop and talk to the restaurant", not "retry".
 
+**About the demo app.** The demo keeps the key in the browser and calls the API from the page. It is a
+development and demonstration tool only. A production integration calls the API from your server, where the
+key lives in a secret store. Browser-to-API calls also require the API to allow the page's origin, which a
+real restaurant API may not.
+
 ## 2. Menu sync
 
 `GET outlets` lists the restaurant's outlets that take your orders, with `acceptingOrders` (a till is open
@@ -53,6 +58,8 @@ sent, which is the same rule the API applies.
 - **You may cancel while `pending` or `accepted`.** From `preparing` on, `POST orders/{id}/cancel` answers
   `409 cannot_cancel`: the kitchen has started. Cancelling an order that is already `cancelled` or `rejected`
   answers `200` with the order as it is.
+- When you cancel, the order's `reason` comes back prefixed `Partner: `: cancel with `customer left` and read
+  `Partner: customer left`.
 - `picked_up`, `rejected` and `cancelled` are final. Stop polling.
 
 ## 4. Idempotency and retry
@@ -64,11 +71,16 @@ answer instead of placing a second order.
 2. Send the same key on every retry of that same request.
 3. Never reuse a key with a different body: the API answers `409 idempotency_conflict`.
 
-Retry only what can succeed on a second try: a transport failure, a `429` (wait `Retry-After`) or a `5xx`.
-Every other `4xx` is telling you something about the request; retrying it changes nothing. The sample's
-`withRetry` encodes exactly this and is a wrapper, so you can see where the retry happens:
+Retry only what can succeed on a second try: a transport failure, a timeout, a `429` (wait `Retry-After`) or
+a `5xx`. Every other `4xx` is telling you something about the request; retrying it changes nothing. The
+sample's `withRetry` encodes exactly this and is a wrapper, so you can see where the retry happens. It backs
+off exponentially with a little random jitter, and never waits more than 60 seconds for a `Retry-After`.
+
+Give every request a deadline. The client's `timeoutMs` option (default `15000`) aborts a request that has had
+no answer by then and throws a `PartnerTimeoutError`, which `withRetry` retries with the same idempotency key:
 
 ```ts
+const client = new PartnerClient({ baseUrl, apiKey, timeoutMs: 15_000 });
 const key = newIdempotencyKey();
 const created = await withRetry(() => client.createOrder(request, key));
 ```
@@ -88,7 +100,7 @@ one when you click "Try again with the same key".
 | `outlet_closed` | The till is closed; nothing was queued. Tell the customer; try later. |
 | `outlet_not_accepting` | Online ordering is paused at that outlet. |
 | `outlet_not_configured` | The outlet cannot take delivery orders yet; tell the restaurant. |
-| `invalid_line` | `line` says which; `reason` says why. Refresh the menu and rebuild the order. |
+| `invalid_line` | `line` says which (0-based: `0` is the first line you sent); `reason` says why. Refresh the menu and rebuild the order. |
 | `cannot_cancel` | The kitchen has started. Call the restaurant. |
 | `idempotency_conflict` | You reused a key with a different body. Mint a new key. |
 | `rate_limited` | Wait `Retry-After` seconds. The limit is 10 requests per second per key, burst 30. |
@@ -96,7 +108,7 @@ one when you click "Try again with the same key".
 
 ## 6. Polling
 
-Poll `GET orders/{orderId}` every **5 seconds while the restaurant is deciding**, then every **15 seconds**,
+Poll `GET orders/{orderId}` every **5 seconds for the first two minutes**, then every **15 seconds**,
 and stop at a final status. If you track many orders on one key, poll the open ones every 15 seconds and stay
 under the rate limit. There are no webhooks in this version of the API.
 
