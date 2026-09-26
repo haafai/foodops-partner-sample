@@ -60,6 +60,13 @@ describe('PartnerClient', () => {
     expect(f.calls).toHaveLength(0);
   });
 
+  it('cancelOrder refuses an empty idempotency key before touching the network', async () => {
+    const f = fakeFetch(() => jsonResponse(200, { id: 'x', status: 'cancelled' }));
+    const client = new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn });
+    await expect(client.cancelOrder('x', 'customer left', '')).rejects.toThrow(TypeError);
+    expect(f.calls).toHaveLength(0);
+  });
+
   it('getOrder and cancelOrder address the order by id', async () => {
     const f = fakeFetch(() => jsonResponse(200, { id: 'a b', status: 'cancelled' }));
     const client = new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn });

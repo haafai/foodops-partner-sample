@@ -66,7 +66,7 @@ export class PartnerClient {
     return this.#json<PartnerOrder>('GET', `orders/${encodeURIComponent(orderId)}`);
   }
 
-  cancelOrder(orderId: string, reason: string, idempotencyKey: string): Promise<PartnerOrder> {
+  async cancelOrder(orderId: string, reason: string, idempotencyKey: string): Promise<PartnerOrder> {
     requireIdempotencyKey(idempotencyKey);
     return this.#json<PartnerOrder>('POST', `orders/${encodeURIComponent(orderId)}/cancel`, {
       body: { reason }, headers: { 'Idempotency-Key': idempotencyKey },
