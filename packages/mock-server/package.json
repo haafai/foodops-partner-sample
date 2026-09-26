@@ -1,0 +1,11 @@
+{
+  "name": "@foodops-partner/mock-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A mock of the FoodOps delivery partner API that implements the contract rule for rule, with a simulated restaurant under /_mock/.",
+  "exports": { ".": "./src/index.ts", "./control-client": "./src/control-client.ts" },
+  "types": "./src/index.ts",
+  "scripts": { "start": "tsx src/bin.ts", "typecheck": "tsc --noEmit -p tsconfig.json" },
+  "dependencies": { "@foodops-partner/client": "*" }
+}
