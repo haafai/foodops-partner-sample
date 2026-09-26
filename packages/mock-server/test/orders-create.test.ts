@@ -82,6 +82,22 @@ describe('POST orders: refusals, in contract order', () => {
     expect(((await raw.json()) as { field: string }).field).toBe('body');
   });
 
+  it('the contract states maximums only: an empty name or phone, a long line note and a large modifier quantity pass validation', async () => {
+    const nameOnly = await create(request({ customer: { name: 'Aishath', phone: '' } }));
+    expect(nameOnly.status).toBe(201);
+    const phoneOnly = await create(request({ partnerReference: 'PX-PHONE', customer: { name: '', phone: '+9607771234' } }));
+    expect(phoneOnly.status).toBe(201);
+    const longNote = await create(request({ partnerReference: 'PX-NOTE', lines: [{ variantId: VARIANT_CLASSIC_REGULAR, quantity: 1, note: 'n'.repeat(2000) }] }));
+    expect(longNote.status).toBe(201);
+    // Past validation: a modifier quantity of 500 reaches the menu's group limit (422), not a 400.
+    const bigModifier = await create(request({ partnerReference: 'PX-MOD', lines: [{ variantId: VARIANT_CLASSIC_REGULAR, quantity: 1, modifiers: [{ modifierId: MOD_CHEESE, quantity: 500 }] }] }));
+    expect(bigModifier.json.error).toBe('invalid_line');
+    const zeroModifier = await create(request({ partnerReference: 'PX-MOD0', lines: [{ variantId: VARIANT_CLASSIC_REGULAR, quantity: 1, modifiers: [{ modifierId: MOD_CHEESE, quantity: 0 }] }] }));
+    expect(zeroModifier.json).toMatchObject({ error: 'invalid_request', field: 'lines[0].modifiers[0]' });
+    const wrongType = await create({ ...request({ partnerReference: 'PX-TYPE' }), customer: { name: 'A', phone: 7 } });
+    expect(wrongType.json).toMatchObject({ error: 'invalid_request', field: 'customer' });
+  });
+
   it('403s for the wrong keys', async () => {
     expect((await create(request(), idem(), MENU_ONLY_KEY)).json.error).toBe('insufficient_scope');
     expect((await create(request(), idem(), UNBOUND_KEY)).json.error).toBe('partner_key_required');

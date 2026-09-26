@@ -23,11 +23,12 @@ const fail = (field: string, message: string): Validation => ({ ok: false, field
 /** The contract's field rules. The first failing field wins. */
 export function validateCreateRequest(body: unknown): Validation {
   if (!isObj(body)) return fail('body', 'The body must be a JSON object.');
-  if (!isStr(body.outletId, 1, 64)) return fail('outletId', 'outletId is required.');
+  if (!isStr(body.outletId, 1, Infinity)) return fail('outletId', 'outletId is required.');
   if (!isStr(body.partnerReference, 1, 64)) return fail('partnerReference', 'partnerReference is required, 1-64 characters.');
   if (present(body.customer)) {
     const c = body.customer;
-    if (!isObj(c) || !isStr(c.name, 1, 100) || !isStr(c.phone, 1, 32)) return fail('customer', 'customer needs a name (at most 100) and a phone (at most 32).');
+    // The contract gives maximums only: either field may be an empty string.
+    if (!isObj(c) || !isStr(c.name, 0, 100) || !isStr(c.phone, 0, 32)) return fail('customer', 'customer needs a name (at most 100) and a phone (at most 32), each a string.');
   }
   if (present(body.notes) && !isStr(body.notes, 0, 500)) return fail('notes', 'notes must be at most 500 characters.');
   if (present(body.expectedPickupAt) && (typeof body.expectedPickupAt !== 'string' || Number.isNaN(Date.parse(body.expectedPickupAt)))) {
@@ -38,11 +39,11 @@ export function validateCreateRequest(body: unknown): Validation {
   for (const [i, line] of body.lines.entries()) {
     if (!isObj(line) || !isStr(line.variantId, 1, 64)) return fail(`lines[${i}].variantId`, 'variantId is required.');
     if (!isInt(line.quantity, 1, 999)) return fail(`lines[${i}].quantity`, 'quantity must be an integer 1-999.');
-    if (present(line.note) && !isStr(line.note, 0, 500)) return fail(`lines[${i}].note`, 'note must be at most 500 characters.');
+    if (present(line.note) && typeof line.note !== 'string') return fail(`lines[${i}].note`, 'note must be a string.');
     if (present(line.modifiers)) {
       if (!Array.isArray(line.modifiers)) return fail(`lines[${i}].modifiers`, 'modifiers must be an array.');
       for (const [j, m] of line.modifiers.entries()) {
-        if (!isObj(m) || !isStr(m.modifierId, 1, 64) || !isInt(m.quantity, 1, 99)) {
+        if (!isObj(m) || !isStr(m.modifierId, 1, 64) || !isInt(m.quantity, 1, Number.MAX_SAFE_INTEGER)) {
           return fail(`lines[${i}].modifiers[${j}]`, 'each modifier needs a modifierId and an integer quantity >= 1.');
         }
       }

@@ -37,8 +37,20 @@ export async function readJson(req: IncomingMessage): Promise<unknown> {
   return JSON.parse(raw) as unknown;
 }
 
+/**
+ * Sent on every response so a browser app on another origin (the demo on
+ * localhost:5180) can call the mock and read the headers the client needs.
+ */
+export const CORS_HEADERS: Readonly<Record<string, string>> = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+  'access-control-allow-headers': 'Authorization, Content-Type, Idempotency-Key, If-None-Match',
+  'access-control-expose-headers': 'ETag, Retry-After, Location, WWW-Authenticate',
+  'access-control-max-age': '600',
+};
+
 export function send(res: ServerResponse, out: JsonResponse): void {
-  const headers: Record<string, string> = { ...out.headers };
+  const headers: Record<string, string> = { ...CORS_HEADERS, ...out.headers };
   let payload: string | undefined;
   if (out.text !== undefined) {
     headers['content-type'] = 'text/plain; charset=utf-8';

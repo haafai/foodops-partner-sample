@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { authenticate } from './auth';
 import { handleControl } from './control';
 import type { MockKey, Scope } from './fixtures';
-import { error, headerValue, readJson, send, text } from './http';
+import { empty, error, headerValue, readJson, send, text } from './http';
 import type { JsonResponse } from './http';
 import { handlePartnerCancel, scheduleAutopilot } from './lifecycle';
 import { handleGetMenu } from './menu';
@@ -99,7 +99,10 @@ export function createRequestHandler(state: MockState): (req: IncomingMessage, r
       const url = new URL(req.url ?? '/', 'http://mock.local');
       const method = (req.method ?? 'GET').toUpperCase();
       let out: JsonResponse;
-      if (url.pathname.startsWith('/_mock/')) out = await handleControl(state, method, url, req);
+      // A browser preflight: answered before the fault queue and before routing,
+      // so it never consumes a queued fault. send() adds the CORS headers.
+      if (method === 'OPTIONS') out = empty(204);
+      else if (url.pathname.startsWith('/_mock/')) out = await handleControl(state, method, url, req);
       else if (url.pathname.startsWith(PARTNER_PREFIX)) out = await handlePartner(state, method, url, req);
       else out = error(404, 'not_found', 'No such route.');
       send(res, out);
