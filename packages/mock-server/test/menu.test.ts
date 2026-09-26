@@ -65,6 +65,17 @@ describe('GET outlets/{id}/menu', () => {
     expect((await call(handle, 'PUT', '/_mock/prices', { key: null, body: { variantId: VARIANT_CLASSIC_REGULAR, price: -1 } })).status).toBe(400);
   });
 
+  it('malformed JSON to /_mock/prices answers 400, not 500', async () => {
+    const res = await fetch(`${handle.url}/_mock/prices`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: '{not json',
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error?: string };
+    expect(body.error).toBe('invalid_request');
+  });
+
   it('404 not_found for an unknown outlet, and the menu-only key may read', async () => {
     const r = await call(handle, 'GET', `${P}/outlets/00000000-0000-4000-8000-000000000000/menu`);
     expect(r.status).toBe(404);
