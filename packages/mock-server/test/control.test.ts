@@ -113,4 +113,13 @@ describe('the simulated restaurant', () => {
     expect(await MockControl.detect(handle.url)).toBe(true);
     expect(await MockControl.detect('http://127.0.0.1:1')).toBe(false);
   });
+
+  it('MockControl.detect is false for a 200 that is not the mock snapshot', async () => {
+    const answering = (body: string, type = 'application/json') => (async () => new Response(body, { status: 200, headers: { 'content-type': type } })) as typeof fetch;
+    expect(await MockControl.detect('http://x', answering('<!doctype html><html><body>app</body></html>', 'text/html'))).toBe(false);
+    expect(await MockControl.detect('http://x', answering('{}'))).toBe(false);
+    expect(await MockControl.detect('http://x', answering('[]'))).toBe(false);
+    expect(await MockControl.detect('http://x', answering('{"outlets":[],"autopilot":[]}'))).toBe(false);
+    expect(await MockControl.detect('http://x', answering('{"outlets":[],"autopilot":{"enabled":true,"stepSeconds":5}}'))).toBe(true);
+  });
 });

@@ -14,10 +14,18 @@ export class MockControl {
     this.#fetch = fetchImpl;
   }
 
+  /**
+   * True only when `/_mock/state` answers 2xx with the mock's snapshot shape (an `outlets` array and an
+   * `autopilot` object). A server that answers every path with 200 (an SPA fallback, a proxy page) is not the mock.
+   */
   static async detect(baseUrl: string, fetchImpl: typeof fetch = globalThis.fetch.bind(globalThis)): Promise<boolean> {
     try {
       const response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/_mock/state`);
-      return response.ok;
+      if (!response.ok) return false;
+      const body = (await response.json()) as unknown;
+      if (typeof body !== 'object' || body === null) return false;
+      const { outlets, autopilot } = body as Record<string, unknown>;
+      return Array.isArray(outlets) && typeof autopilot === 'object' && autopilot !== null && !Array.isArray(autopilot);
     } catch {
       return false;
     }
