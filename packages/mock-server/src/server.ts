@@ -3,9 +3,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { authenticate } from './auth';
 import { handleControl } from './control';
 import type { MockKey, Scope } from './fixtures';
-import { error, readJson, send, text } from './http';
+import { error, headerValue, readJson, send, text } from './http';
 import type { JsonResponse } from './http';
 import { handleGetMenu } from './menu';
+import { handleCreateOrder, handleGetOrder } from './orders';
 import { handleListOutlets } from './outlets';
 import type { Scheduler } from './scheduler';
 import type { FaultResponse } from './snapshot';
@@ -30,10 +31,25 @@ interface Route {
   handle: (ctx: RouteContext, match: RegExpExecArray) => JsonResponse | Promise<JsonResponse>;
 }
 
+/** The two writes need the header before anything else, including reading the body. */
+export function requireIdempotencyKey(req: IncomingMessage): string | JsonResponse {
+  const key = headerValue(req.headers['idempotency-key'])?.trim();
+  return key ? key : error(400, 'idempotency_key_required', 'Send an Idempotency-Key header with every write.');
+}
+
 /** Tasks 5–7 add rows here. Order does not matter; patterns are anchored. */
 export const routes: Route[] = [
   { method: 'GET', pattern: /^outlets$/, scope: 'menu.read', handle: ({ state }) => handleListOutlets(state) },
   { method: 'GET', pattern: /^outlets\/([^/]+)\/menu$/, scope: 'menu.read', handle: ({ state, req }, m) => handleGetMenu(state, req, decodeURIComponent(m[1])) },
+  {
+    method: 'POST', pattern: /^orders$/, scope: 'orders.write',
+    handle: async ({ state, key, req, body }) => {
+      const idempotencyKey = requireIdempotencyKey(req);
+      if (typeof idempotencyKey !== 'string') return idempotencyKey;
+      return handleCreateOrder(state, key, await body(), idempotencyKey);
+    },
+  },
+  { method: 'GET', pattern: /^orders\/([^/]+)$/, scope: 'orders.write', handle: ({ state, key }, m) => handleGetOrder(state, key, decodeURIComponent(m[1])) },
 ];
 
 function faultResponse(fault: FaultResponse): JsonResponse {
