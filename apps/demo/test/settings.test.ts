@@ -22,7 +22,7 @@ describe('validateSettings', () => {
     expect(validateSettings({ baseUrl: 'https://api.example.com', apiKey: LIVE })).toBeNull();
   });
   it('blocks a live key against localhost or plain http', () => {
-    expect(validateSettings({ baseUrl: 'https://localhost:7202', apiKey: LIVE })).toMatch(/live key/i);
+    expect(validateSettings({ baseUrl: 'https://localhost:8443', apiKey: LIVE })).toMatch(/live key/i);
     expect(validateSettings({ baseUrl: 'http://api.example.com', apiKey: LIVE })).toMatch(/live key/i);
   });
   it('rejects a malformed key or URL', () => {

@@ -19,7 +19,7 @@ describe('SetupPage', () => {
   it('blocks a live key against a localhost URL and keeps the key out of the page', async () => {
     const user = userEvent.setup();
     renderSetup();
-    await user.type(screen.getByLabelText(/base url/i), 'https://localhost:7202');
+    await user.type(screen.getByLabelText(/base url/i), 'https://localhost:8443');
     await user.type(screen.getByLabelText(/api key/i), 'hbk_live_k3f7x2m4q6zt_abcDEF123');
     await user.click(screen.getByRole('button', { name: /save/i }));
     expect(screen.getByRole('alert')).toHaveTextContent(/live key/i);
