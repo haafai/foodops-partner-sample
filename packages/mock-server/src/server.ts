@@ -5,6 +5,7 @@ import { handleControl } from './control';
 import type { MockKey, Scope } from './fixtures';
 import { error, readJson, send, text } from './http';
 import type { JsonResponse } from './http';
+import { handleGetMenu } from './menu';
 import { handleListOutlets } from './outlets';
 import type { Scheduler } from './scheduler';
 import type { FaultResponse } from './snapshot';
@@ -32,6 +33,7 @@ interface Route {
 /** Tasks 5–7 add rows here. Order does not matter; patterns are anchored. */
 export const routes: Route[] = [
   { method: 'GET', pattern: /^outlets$/, scope: 'menu.read', handle: ({ state }) => handleListOutlets(state) },
+  { method: 'GET', pattern: /^outlets\/([^/]+)\/menu$/, scope: 'menu.read', handle: ({ state, req }, m) => handleGetMenu(state, req, decodeURIComponent(m[1])) },
 ];
 
 function faultResponse(fault: FaultResponse): JsonResponse {
