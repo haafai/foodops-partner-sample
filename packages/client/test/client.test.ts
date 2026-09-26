@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PARTNER_API_PREFIX, PartnerClient } from '../src/client';
-import { PartnerApiError } from '../src/errors';
+import { MissingIdempotencyKeyError, PartnerApiError, PartnerTimeoutError } from '../src/errors';
+import { withRetry } from '../src/retry';
 import type { CreatePartnerOrderRequest } from '../src/types';
 import { fakeFetch, jsonResponse } from './fake-fetch';
 
@@ -86,5 +87,72 @@ describe('PartnerClient', () => {
     expect((error as PartnerApiError).code).toBe('insufficient_scope');
     expect((error as Error).message).not.toContain(KEY);
     expect(JSON.stringify(error)).not.toContain(KEY);
+  });
+
+  it('getMenu falls back to the quoted menu version when the ETag header is missing', async () => {
+    const menu = { outletId: 'o1', version: 'abc', categories: [] };
+    const f = fakeFetch(() => jsonResponse(200, menu));
+    const result = await new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn }).getMenu('o1');
+    expect(result).toEqual({ modified: true, menu, etag: '"abc"' });
+  });
+
+  it('the missing-key error is a MissingIdempotencyKeyError (still a TypeError) and withRetry does not retry it', async () => {
+    const f = fakeFetch(() => jsonResponse(201, {}));
+    const client = new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn });
+    let attempts = 0;
+    const error = await withRetry(() => { attempts++; return client.createOrder(request, '  '); }, { sleep: async () => {} }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(MissingIdempotencyKeyError);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).name).toBe('MissingIdempotencyKeyError');
+    expect(attempts).toBe(1);
+    expect(f.calls).toHaveLength(0);
+  });
+});
+
+/** A fetch that never answers until its signal aborts, then rejects the way fetch does. */
+function hangingFetch() {
+  return fakeFetch((_url, init) => new Promise<Response>((_resolve, reject) => {
+    init.signal?.addEventListener('abort', () => reject(new DOMException('This operation was aborted', 'AbortError')));
+  }));
+}
+
+describe('PartnerClient timeout', () => {
+  it('passes an AbortSignal to fetch on every call', async () => {
+    const f = fakeFetch(() => jsonResponse(200, []));
+    await new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn }).listOutlets();
+    expect(f.calls[0]?.init.signal).toBeInstanceOf(AbortSignal);
+    expect(f.calls[0]?.init.signal?.aborted).toBe(false);
+  });
+
+  it('throws a PartnerTimeoutError naming the method, path and limit, without the key or base URL', async () => {
+    const f = hangingFetch();
+    const client = new PartnerClient({ baseUrl: `https://user:pass@api.example.test`, apiKey: KEY, fetch: f.fn, timeoutMs: 20 });
+    const error = await client.createOrder(request, 'idem-t').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PartnerTimeoutError);
+    expect(error).toMatchObject({ name: 'PartnerTimeoutError', method: 'POST', path: 'orders', timeoutMs: 20 });
+    expect((error as Error).message).toBe('POST orders timed out after 20 ms');
+    expect(JSON.stringify(error) + String(error)).not.toContain(KEY);
+    expect(String(error)).not.toContain('pass');
+    expect(f.calls[0]?.init.signal?.aborted).toBe(true);
+  });
+
+  it('a timeout is retryable: withRetry tries again and the second answer wins', async () => {
+    let n = 0;
+    const f = fakeFetch((_url, init) => {
+      n++;
+      if (n === 1) return new Promise<Response>((_r, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError'))));
+      return jsonResponse(200, [{ outletId: 'o1' }]);
+    });
+    const client = new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn, timeoutMs: 20 });
+    const outlets = await withRetry(() => client.listOutlets(), { sleep: async () => {} });
+    expect(outlets).toEqual([{ outletId: 'o1' }]);
+    expect(f.calls).toHaveLength(2);
+  });
+
+  it('an error that is not the timeout passes through unchanged', async () => {
+    const failure = new TypeError('fetch failed');
+    const f = fakeFetch(() => Promise.reject(failure));
+    const client = new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn, timeoutMs: 1000 });
+    await expect(client.listOutlets()).rejects.toBe(failure);
   });
 });

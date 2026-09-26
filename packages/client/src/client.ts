@@ -1,4 +1,4 @@
-import { errorFromResponse } from './errors';
+import { MissingIdempotencyKeyError, PartnerTimeoutError, errorFromResponse } from './errors';
 import type { CreatePartnerOrderRequest, PartnerMenu, PartnerOrder, PartnerOrderCreated, PartnerOutlet } from './types';
 
 export const PARTNER_API_PREFIX = '/api/external/v1/partner';
@@ -10,7 +10,11 @@ export interface PartnerClientOptions {
   apiKey: string;
   /** Inject a fetch for tests or for Node versions without a global one. */
   fetch?: typeof fetch;
+  /** Give up on a request with no answer after this long and throw a PartnerTimeoutError. Default 15000. */
+  timeoutMs?: number;
 }
+
+export const DEFAULT_TIMEOUT_MS = 15_000;
 
 export type MenuResult =
   | { modified: true; menu: PartnerMenu; etag: string }
@@ -23,7 +27,7 @@ interface SendInit {
 
 function requireIdempotencyKey(key: string): void {
   if (typeof key !== 'string' || key.trim() === '') {
-    throw new TypeError('An idempotency key is required. Mint it with newIdempotencyKey() before the first attempt and reuse it on retries.');
+    throw new MissingIdempotencyKeyError();
   }
 }
 
@@ -32,6 +36,7 @@ export class PartnerClient {
   readonly #baseUrl: string;
   readonly #apiKey: string;
   readonly #fetch: typeof fetch;
+  readonly #timeoutMs: number;
 
   constructor(options: PartnerClientOptions) {
     let base = options.baseUrl.trim().replace(/\/+$/, '');
@@ -39,6 +44,7 @@ export class PartnerClient {
     this.#baseUrl = base;
     this.#apiKey = options.apiKey;
     this.#fetch = options.fetch ?? globalThis.fetch.bind(globalThis);
+    this.#timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
   listOutlets(): Promise<PartnerOutlet[]> {
@@ -53,7 +59,8 @@ export class PartnerClient {
     if (response.status === 304) return { modified: false, etag: options.ifNoneMatch ?? '' };
     if (!response.ok) throw await errorFromResponse(response);
     const menu = (await response.json()) as PartnerMenu;
-    return { modified: true, menu, etag: response.headers.get('etag') ?? menu.version };
+    // ETags are quoted strings; when the header is missing, quote the menu version the same way.
+    return { modified: true, menu, etag: response.headers.get('etag') ?? `"${menu.version}"` };
   }
 
   /** `idempotencyKey` is yours: mint it once per order and send the same value on every retry. */
@@ -82,7 +89,20 @@ export class PartnerClient {
       headers.set('Content-Type', 'application/json');
       body = JSON.stringify(init.body);
     }
-    return this.#fetch(`${this.#baseUrl}${PARTNER_API_PREFIX}/${path}`, { method, headers, body });
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.#timeoutMs);
+    try {
+      return await this.#fetch(`${this.#baseUrl}${PARTNER_API_PREFIX}/${path}`, { method, headers, body, signal: controller.signal });
+    } catch (e) {
+      if (timedOut) throw new PartnerTimeoutError(method, path, this.#timeoutMs);
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async #json<T>(method: string, path: string, init: SendInit = {}): Promise<T> {

@@ -80,3 +80,29 @@ export async function errorFromResponse(response: Response, now: number = Date.n
     retryAfterSeconds,
   });
 }
+
+/**
+ * A request that got no answer within the client's `timeoutMs`. It carries the method and the relative path
+ * only: never the key, never the base URL. `withRetry` retries it.
+ */
+export class PartnerTimeoutError extends Error {
+  readonly method: string;
+  readonly path: string;
+  readonly timeoutMs: number;
+
+  constructor(method: string, path: string, timeoutMs: number) {
+    super(`${method} ${path} timed out after ${timeoutMs} ms`);
+    this.name = 'PartnerTimeoutError';
+    this.method = method;
+    this.path = path;
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+/** A create or cancel called without an idempotency key. A programming error: `withRetry` never retries it. */
+export class MissingIdempotencyKeyError extends TypeError {
+  constructor() {
+    super('An idempotency key is required. Mint it with newIdempotencyKey() before the first attempt and reuse it on retries.');
+    this.name = 'MissingIdempotencyKeyError';
+  }
+}
