@@ -5,6 +5,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { vi } from 'vitest';
 import type { PartnerClient } from '@foodops-partner/client';
 import { CartProvider } from '../src/cart/CartProvider';
+import type { CartOutlet } from '../src/cart/CartProvider';
+import type { CartLine } from '../src/cart/cart';
 import { SessionProvider } from '../src/config/SessionProvider';
 import type { Mode } from '../src/config/mode';
 import type { Settings } from '../src/config/settings';
@@ -27,6 +29,7 @@ export interface RenderOptions {
   mode?: Mode;
   settings?: Settings;
   route?: string;
+  cart?: { outlet: CartOutlet; lines: CartLine[] };
 }
 
 export function renderWithProviders(ui: ReactNode, options: RenderOptions = {}) {
@@ -36,7 +39,7 @@ export function renderWithProviders(ui: ReactNode, options: RenderOptions = {}) 
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[options.route ?? '/']}>
         <SessionProvider initial={{ settings: options.settings ?? TEST_SETTINGS, mode: options.mode ?? 'mock', client }}>
-          <CartProvider>{ui}</CartProvider>
+          <CartProvider initial={options.cart}>{ui}</CartProvider>
         </SessionProvider>
       </MemoryRouter>
     </QueryClientProvider>,

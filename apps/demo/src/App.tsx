@@ -1,6 +1,7 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { ModeBanner } from './components/ModeBanner';
 import { useSession } from './config/SessionProvider';
+import { CheckoutPage } from './pages/CheckoutPage';
 import { MenuPage } from './pages/MenuPage';
 import { OutletsPage } from './pages/OutletsPage';
 import { SetupPage } from './pages/SetupPage';
@@ -12,6 +13,7 @@ export function App() {
       <ModeBanner />
       <nav className="flex gap-4 border-b bg-white px-4 py-2 text-sm">
         <Link to="/outlets">Outlets</Link>
+        <Link to="/checkout">Checkout</Link>
         <Link to="/setup">Setup</Link>
       </nav>
       <main>
@@ -20,6 +22,7 @@ export function App() {
           <Route path="/setup" element={<SetupPage />} />
           <Route path="/outlets" element={<OutletsPage />} />
           <Route path="/outlets/:outletId/menu" element={<MenuPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
         </Routes>
       </main>
     </div>

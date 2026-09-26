@@ -16,9 +16,9 @@ export interface CartValue {
 
 const CartContext = createContext<CartValue | null>(null);
 
-export function CartProvider({ children }: { children: ReactNode }) {
-  const [outlet, setOutlet] = useState<CartOutlet | null>(null);
-  const [lines, setLines] = useState<CartLine[]>([]);
+export function CartProvider({ children, initial }: { children: ReactNode; initial?: { outlet: CartOutlet; lines: CartLine[] } }) {
+  const [outlet, setOutlet] = useState<CartOutlet | null>(initial?.outlet ?? null);
+  const [lines, setLines] = useState<CartLine[]>(initial?.lines ?? []);
 
   const add = useCallback((line: CartLine, next: CartOutlet) => {
     setOutlet((current) => (current?.outletId === next.outletId ? current : next));
