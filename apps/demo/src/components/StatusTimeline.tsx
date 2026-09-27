@@ -1,16 +1,26 @@
-import type { PartnerOrder, PartnerOrderStatus } from '@foodops-partner/client';
+import type { PartnerOrder } from '@foodops-partner/client';
+import { statusLabel } from '../orders/statusCopy';
 
-const STEPS: Array<[PartnerOrderStatus, string]> = [['pending', 'Pending'], ['accepted', 'Accepted'], ['preparing', 'Preparing'], ['ready', 'Ready'], ['picked_up', 'Picked up']];
+const STEPS = ['pending', 'accepted', 'preparing', 'ready', 'picked_up'];
 
+/** The five steps of an order; one that was rejected or cancelled shows where it started and where it ended. */
 export function StatusTimeline({ order }: { order: PartnerOrder }) {
-  const reached = STEPS.findIndex(([s]) => s === order.status);
+  const stopped = order.status === 'rejected' || order.status === 'cancelled';
+  const steps = stopped ? ['pending', order.status] : STEPS;
+  const reached = steps.indexOf(order.status);
+  const endTone = order.status === 'rejected' ? 'bg-chili text-white' : 'bg-navy text-white';
   return (
-    <ol className="flex flex-wrap gap-2 text-xs" aria-label="Order progress">
-      {STEPS.map(([status, label], i) => (
-        <li key={status} className={`rounded px-2 py-1 ${i <= reached ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>{label}</li>
-      ))}
-      {order.status === 'rejected' && <li className="rounded bg-red-600 px-2 py-1 text-white">Rejected</li>}
-      {order.status === 'cancelled' && <li className="rounded bg-slate-700 px-2 py-1 text-white">Cancelled by {order.cancelledBy ?? 'unknown'}</li>}
+    <ol className="card flex items-start gap-1 p-4 text-center text-xs font-semibold" aria-label="Order progress">
+      {steps.map((status, i) => {
+        const done = i <= reached;
+        const tone = stopped && i === reached ? endTone : done ? 'bg-leaf text-white' : 'bg-sand text-muted';
+        return (
+          <li key={status} aria-current={i === reached ? 'step' : undefined} className={`flex min-w-0 flex-1 flex-col items-center gap-1 ${done ? 'text-navy' : 'text-muted'}`}>
+            <span aria-hidden="true" className={`flex h-7 w-7 items-center justify-center rounded-full ${tone}`}>{i + 1}</span>
+            <span className="max-w-full truncate">{status === 'pending' ? 'Pending' : statusLabel(status)}</span>
+          </li>
+        );
+      })}
     </ol>
   );
 }

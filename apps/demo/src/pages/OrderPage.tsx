@@ -4,6 +4,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { canCancel, isTerminal, newIdempotencyKey } from '@foodops-partner/client';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { SimulatorPanel } from '../components/SimulatorPanel';
+import { StatusHero } from '../components/StatusHero';
 import { StatusTimeline } from '../components/StatusTimeline';
 import { useSession } from '../config/SessionProvider';
 import { listTracked, updateTracked } from '../orders/orderStore';
@@ -29,7 +30,7 @@ export function OrderPage() {
   }, [orderId, query.data]);
 
   if (!client) return <Navigate to="/setup" replace />;
-  if (query.isPending) return <p className="p-4">Loading order…</p>;
+  if (query.isPending) return <p className="p-4 text-muted">Loading order…</p>;
   if (!query.data) return <div className="p-4"><ErrorNotice error={query.error} /></div>;
   const order = query.data;
   const interval = pollIntervalMs({ status: order.status, createdAt: order.createdAt, now: Date.now() });
@@ -51,31 +52,33 @@ export function OrderPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4">
-      <header>
-        <h1 className="text-xl font-semibold">{order.reference} <span className="text-sm font-normal text-slate-500">· your reference {order.partnerReference}</span></h1>
-        {tracked && <p className="text-sm text-slate-600">{tracked.outletName}</p>}
-      </header>
+      <StatusHero order={order} outletName={tracked?.outletName ?? null} />
       <StatusTimeline order={order} />
-      <p className="text-sm">Status: <strong data-testid="order-status">{order.status}</strong>{order.reason && <span> · {order.reason}</span>}</p>
-      <p className="text-xs text-slate-500">{interval === false ? 'Final status; polling stopped.' : `Checking every ${interval / 1000} s.`}</p>
+      <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
+        <span className="chip">status <strong data-testid="order-status">{order.status}</strong></span>
+        <span>{interval === false ? 'Final status; polling stopped.' : `Checking every ${interval / 1000} s.`}</span>
+      </p>
       {query.isError && <ErrorNotice error={query.error} />}
-      <table className="w-full text-sm">
-        <tbody>
-          <tr><td>Subtotal</td><td className="text-right">{money(order.totals.subtotal)}</td></tr>
-          <tr><td>Tax (included)</td><td className="text-right">{money(order.totals.tax)}</td></tr>
-          <tr><td>Service charge</td><td className="text-right">{money(order.totals.serviceCharge)}</td></tr>
-          <tr className="font-medium"><td>Restaurant total</td><td className="text-right">{money(order.totals.total)}</td></tr>
-        </tbody>
-      </table>
+      <section className="card p-4">
+        <h2 className="text-lg font-semibold">Totals</h2>
+        <table className="mt-2 w-full text-sm">
+          <tbody>
+            <tr><td>Subtotal</td><td className="text-right">{money(order.totals.subtotal)}</td></tr>
+            <tr><td>Tax (included)</td><td className="text-right">{money(order.totals.tax)}</td></tr>
+            <tr><td>Service charge</td><td className="text-right">{money(order.totals.serviceCharge)}</td></tr>
+            <tr className="font-bold"><td className="pt-2">Restaurant total</td><td className="pt-2 text-right">{money(order.totals.total)}</td></tr>
+          </tbody>
+        </table>
+      </section>
       {tracked?.priceMismatch && (
-        <p role="status" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <p role="status" className="rounded-xl border-l-4 border-mustard bg-white p-3 text-sm shadow-card">
           The restaurant's total ({money(tracked.total)}) differs from your estimate ({money(tracked.partnerTotal ?? 0)}). The restaurant's total is what is charged; the order still went through.
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <input className="rounded border px-2 py-1" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} aria-label="Cancellation reason" />
-        <button type="button" className="rounded bg-red-700 px-3 py-1 text-white disabled:opacity-40" disabled={!canCancel(order.status) || cancelling} onClick={cancel}>Cancel order</button>
-        {!canCancel(order.status) && !isTerminal(order.status) && <span className="text-xs text-slate-500">The kitchen has started; call the restaurant.</span>}
+      <div className="card flex flex-wrap items-center gap-2 p-4 text-sm">
+        <input className="field mt-0 min-w-0 flex-1" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} aria-label="Cancellation reason" />
+        <button type="button" className="btn-danger" disabled={!canCancel(order.status) || cancelling} onClick={cancel}>Cancel order</button>
+        {!canCancel(order.status) && !isTerminal(order.status) && <span className="w-full text-xs text-muted">The kitchen has started; call the restaurant.</span>}
       </div>
       <ErrorNotice error={cancelError} />
       {mode === 'mock' && <SimulatorPanel orderId={orderId} status={order.status} />}

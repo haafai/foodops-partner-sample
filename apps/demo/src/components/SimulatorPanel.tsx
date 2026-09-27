@@ -30,33 +30,32 @@ export function SimulatorPanel({ orderId, status }: { orderId: string; status: P
   }
   const rejectReason = reason === 'Other' ? other.trim() || 'Other' : reason;
   const advanceable = status === 'accepted' || status === 'preparing' || status === 'ready';
-  const button = 'rounded border px-2 py-1 disabled:opacity-40';
 
   return (
-    <section aria-label="Restaurant simulator" className="rounded border border-dashed border-emerald-600 bg-emerald-50 p-3 text-sm">
-      <h2 className="font-semibold">Restaurant simulator (mock only)</h2>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        <button type="button" className={button} disabled={status !== 'pending'} onClick={() => act(() => mock.accept(orderId))}>Accept</button>
-        <button type="button" className={button} disabled={!advanceable} onClick={() => act(() => mock.advance(orderId))}>Advance</button>
-        <button type="button" className={button} disabled={status !== 'pending'} onClick={() => act(() => mock.timeout(orderId))}>Time out</button>
-        <button type="button" className={button} disabled={isTerminal(status)} onClick={() => act(() => mock.restaurantCancel(orderId, 'Kitchen closed early'))}>Restaurant cancel</button>
+    <section aria-label="Restaurant simulator" className="rounded-card border-2 border-dashed border-leaf bg-leaf/5 p-4 text-sm">
+      <h2 className="text-lg font-semibold text-leaf">Restaurant simulator (mock only)</h2>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button type="button" className="btn-ghost" disabled={status !== 'pending'} onClick={() => act(() => mock.accept(orderId))}>Accept</button>
+        <button type="button" className="btn-ghost" disabled={!advanceable} onClick={() => act(() => mock.advance(orderId))}>Advance</button>
+        <button type="button" className="btn-ghost" disabled={status !== 'pending'} onClick={() => act(() => mock.timeout(orderId))}>Time out</button>
+        <button type="button" className="btn-ghost" disabled={isTerminal(status)} onClick={() => act(() => mock.restaurantCancel(orderId, 'Kitchen closed early'))}>Restaurant cancel</button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select className="rounded border px-2 py-1" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Rejection reason">
+        <select className="field mt-0 w-auto" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Rejection reason">
           {REASONS.map((r) => <option key={r}>{r}</option>)}
         </select>
-        {reason === 'Other' && <input className="rounded border px-2 py-1" placeholder="Reason" value={other} onChange={(e) => setOther(e.target.value)} />}
-        <button type="button" className={button} disabled={status !== 'pending'} onClick={() => act(() => mock.reject(orderId, rejectReason))}>Reject</button>
+        {reason === 'Other' && <input className="field mt-0 w-auto" placeholder="Reason" value={other} onChange={(e) => setOther(e.target.value)} />}
+        <button type="button" className="btn-ghost" disabled={status !== 'pending'} onClick={() => act(() => mock.reject(orderId, rejectReason))}>Reject</button>
       </div>
-      <label className="mt-2 block">
+      <label className="mt-3 block">
         <input type="checkbox" checked={autopilot} onChange={(e) => {
           const next = e.target.checked;
           void act(() => mock.setAutopilot(next, 5)).then((ok) => { if (ok) setAutopilot(next); });
         }} />{' '}
         Autopilot: accept new orders after 5 s and advance every 5 s
       </label>
-      <p className="mt-1 text-xs text-slate-600">{canCancel(status) ? 'The partner may still cancel.' : 'Past the point of partner cancellation.'}</p>
-      {problem && <p className="mt-1 text-xs text-red-700">{problem}</p>}
+      <p className="mt-1 text-xs text-muted">{canCancel(status) ? 'The partner may still cancel.' : 'Past the point of partner cancellation.'}</p>
+      {problem && <p className="mt-1 text-xs font-semibold text-chili">{problem}</p>}
     </section>
   );
 }
