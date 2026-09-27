@@ -47,9 +47,20 @@ export function DishCard({ item, onAdd, onCustomise }: DishCardProps) {
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <p className="font-display font-semibold">{price}</p>
           {!soldOut && (
-            <button type="button" className="btn-primary px-4 py-1.5 text-sm" onClick={add} aria-label={`Add ${item.name}`}>
-              {added ? 'Added' : 'Add'}
-            </button>
+            <div className="flex items-center gap-1.5">
+              {/* A plain item adds in one tap; this opens the same sheet as the others, for a quantity or a note. */}
+              {plain && (
+                <button type="button" onClick={() => onCustomise(item)} aria-label={`Customise ${item.name}`} title="Quantity and note"
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-sand bg-white text-navy transition hover:bg-sand">
+                  <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" />
+                  </svg>
+                </button>
+              )}
+              <button type="button" className="btn-primary px-4 py-1.5 text-sm" onClick={add} aria-label={`Add ${item.name}`}>
+                {added ? 'Added' : 'Add'}
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { dishImageFor, heroImage, initialsOf, outletImageFor, slugify } from '../src/images/catalog';
+import { DISH_SLUGS, OUTLET_SLUGS, dishImageFor, heroImage, initialsOf, outletImageFor, slugify } from '../src/images/catalog';
 import { AVAILABLE_IMAGES } from '../src/images/manifest';
+
+/** The photos that are on disk, as the site-absolute paths the manifest uses. Vite lists them; nothing is loaded. */
+const ON_DISK = new Set(Object.keys(import.meta.glob('../public/images/**/*.jpg')).map((file) => file.replace('../public', '')));
 
 const ALL = new Set(['/images/dishes/classic-burger.jpg', '/images/outlets/marine-drive.jpg', '/images/hero.jpg']);
 
@@ -45,10 +48,22 @@ describe('outletImageFor and heroImage', () => {
 });
 
 describe('the shipped manifest', () => {
-  it('is empty until the photos are generated, so the demo renders tiles and requests nothing', () => {
-    expect([...AVAILABLE_IMAGES]).toEqual([]);
-    expect(dishImageFor({ name: 'Classic Burger', imageUrl: null })).toBeNull();
-    expect(outletImageFor({ name: 'Marine Drive' })).toBeNull();
-    expect(heroImage()).toBeNull();
+  it('lists only photos the catalogue can ask for, and each one is on disk', () => {
+    const known = new Set([
+      ...[...DISH_SLUGS].map((slug) => '/images/dishes/' + slug + '.jpg'),
+      ...[...OUTLET_SLUGS].map((slug) => '/images/outlets/' + slug + '.jpg'),
+      '/images/hero.jpg',
+    ]);
+    for (const path of AVAILABLE_IMAGES) {
+      expect(known.has(path), path + ' is not a photo the catalogue knows').toBe(true);
+      expect(ON_DISK.has(path), path + ' is listed but not on disk').toBe(true);
+    }
+  });
+
+  it('resolves nothing from an empty manifest, so the demo renders tiles and requests nothing', () => {
+    const none = new Set<string>();
+    expect(dishImageFor({ name: 'Classic Burger', imageUrl: null }, none)).toBeNull();
+    expect(outletImageFor({ name: 'Marine Drive' }, none)).toBeNull();
+    expect(heroImage(none)).toBeNull();
   });
 });

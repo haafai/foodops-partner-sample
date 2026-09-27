@@ -25,7 +25,7 @@ export function StatusHero({ order, outletName }: { order: PartnerOrder; outletN
       <div className="min-w-0">
         <h1 className="break-words text-2xl font-bold" data-testid="status-title">{copy.title}</h1>
         {copy.subtitle && <p className="break-words text-sm text-muted">{copy.subtitle}</p>}
-        <p className="mt-1 text-xs text-muted">{order.reference} · your reference {order.partnerReference}</p>
+        <p className="mt-1 text-xs text-muted">{[outletName?.trim(), order.reference].filter(Boolean).join(' · ')} · your reference {order.partnerReference}</p>
       </div>
     </div>
   );

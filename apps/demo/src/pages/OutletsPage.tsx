@@ -33,7 +33,9 @@ export function OutletsPage() {
           </label>
         </div>
       </section>
-      {shown.length === 0
+      {query.data.length === 0
+        ? <p className="card p-6 text-center text-muted">No restaurants are available to this key yet. Ask the restaurant to assign its outlets to your key.</p>
+        : shown.length === 0
         ? <p className="p-6 text-center text-muted">No restaurant matches “{filter.trim()}”.</p>
         : <div className="grid gap-4 sm:grid-cols-2">{shown.map((outlet) => <RestaurantCard key={outlet.outletId} outlet={outlet} />)}</div>}
     </div>

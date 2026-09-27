@@ -37,8 +37,11 @@ export function statusCopy(order: Pick<PartnerOrder, 'status' | 'reason' | 'canc
       subtitle: reason === 'timeout' ? 'The restaurant did not answer in time.' : reason || 'No reason was given.',
     };
     case 'cancelled': {
-      const who = order.cancelledBy === 'partner' ? 'by you' : order.cancelledBy === 'restaurant' ? 'by the restaurant' : '';
-      return { title: 'Cancelled', subtitle: [who, reason].filter(Boolean).join(' · ') };
+      const byPartner = order.cancelledBy === 'partner';
+      const who = byPartner ? 'by you' : order.cancelledBy === 'restaurant' ? 'by the restaurant' : '';
+      // The API returns a partner's own reason prefixed "Partner: "; the sentence already says who.
+      const why = byPartner ? reason.replace(/^Partner:\s*/, '') : reason;
+      return { title: 'Cancelled', subtitle: [who, why].filter(Boolean).join(' · ') };
     }
     // A newer API may send a status this sample was not written for: show it, do not crash.
     default: return { title: String(order.status), subtitle: '' };

@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  /* The scrollbar keeps its place when a sheet locks the page, so nothing jumps sideways. */
+  html {
+    scrollbar-gutter: stable;
+  }
   h1, h2, h3 {
     @apply font-display;
   }

@@ -31,4 +31,12 @@ describe('DishImage', () => {
     rerender(<DishImage src="https://cdn.example.test/other.jpg" name="Classic Burger" />);
     expect(screen.getByRole('img', { name: 'Classic Burger' }).tagName).toBe('IMG');
   });
+
+  it('lets the caller size the initials, and carries the bowl glyph', () => {
+    render(<DishImage src={null} name="Onion Rings" className="h-24 w-24 text-2xl" />);
+    const tile = screen.getByTestId('image-tile');
+    expect(tile.className.split(/\s+/).filter((c) => /^text-(xs|sm|base|lg|xl|\dxl)$/.test(c))).toEqual(['text-2xl']);
+    expect(tile.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(tile).toHaveTextContent('OR');
+  });
 });

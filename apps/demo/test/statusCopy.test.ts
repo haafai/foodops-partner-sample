@@ -53,4 +53,10 @@ describe('statusCopy', () => {
   it('labels every status for a pill', () => {
     expect(ALL.map(statusLabel)).toEqual(['Waiting', 'Accepted', 'Preparing', 'Ready', 'Picked up', 'Rejected', 'Cancelled']);
   });
+
+  it('drops the prefix the API puts before a partner cancellation reason, since the sentence already says who', () => {
+    expect(statusCopy(order('cancelled', 'Partner: Customer cancelled', 'partner'), 'Marine Drive').subtitle).toBe('by you · Customer cancelled');
+    expect(statusCopy(order('cancelled', 'Partner: ', 'partner'), 'Marine Drive').subtitle).toBe('by you');
+    expect(statusCopy(order('cancelled', 'Partner: left', 'restaurant'), 'Marine Drive').subtitle).toBe('by the restaurant · Partner: left');
+  });
 });

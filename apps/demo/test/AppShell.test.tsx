@@ -67,4 +67,23 @@ describe('AppShell', () => {
     await user.click(within(sheet).getByRole('link', { name: 'Go to checkout' }));
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('lets the tab bar sit at the bottom of the screen: no ancestor of the navigation creates a containing block', () => {
+    renderWithProviders(<AppShell><p>page</p></AppShell>, { client: client(), route: '/orders' });
+    // A filter, a backdrop filter or a transform on an ancestor makes it the containing block of a fixed
+    // descendant, and the tab bar lands on the header. jsdom has no layout, so the classes are the guard.
+    for (let el = screen.getByRole('navigation', { name: 'Primary' }).parentElement; el; el = el.parentElement) {
+      expect(el.className).not.toMatch(/\b(backdrop-|blur|filter|transform|translate|scale-|rotate|perspective)/);
+    }
+  });
+
+  it('starts every page at the top', async () => {
+    const user = userEvent.setup();
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    renderWithProviders(<AppShell><p>page</p></AppShell>, { client: client(), route: '/outlets' });
+    scrollTo.mockClear();
+    await user.click(within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('link', { name: 'Orders' }));
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+    scrollTo.mockRestore();
+  });
 });

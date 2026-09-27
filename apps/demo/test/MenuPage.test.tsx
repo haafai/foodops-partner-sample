@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -157,5 +157,22 @@ describe('MenuPage', () => {
     expect(await screen.findByText(/not modified/)).toBeInTheDocument();
     expect(getMenu).toHaveBeenNthCalledWith(2, 'o-marine', { ifNoneMatch: '"abc123def456"' });
     expect(screen.getByTestId('menu-version')).toHaveTextContent('version abc123de');
+  });
+
+  it('lets a plain item take a quantity and a note through Customise', async () => {
+    const user = userEvent.setup();
+    renderMenu();
+    await screen.findByText(/Partner \+15%/);
+    expect(screen.queryByRole('button', { name: 'Customise Classic Burger' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Customise Veggie Burger' }));
+    const sheet = screen.getByRole('dialog', { name: 'Veggie Burger' });
+    fireEvent.change(within(sheet).getByLabelText('Qty'), { target: { value: '3' } });
+    await user.type(within(sheet).getByPlaceholderText('Note for the kitchen'), 'no sauce');
+    await user.click(within(sheet).getByRole('button', { name: 'Add Veggie Burger to cart' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const cart = screen.getByRole('complementary');
+    expect(cart).toHaveTextContent('3 × Veggie Burger (Regular)');
+    expect(cart).toHaveTextContent('no sauce');
+    expect(cart).toHaveTextContent('255.00');
   });
 });

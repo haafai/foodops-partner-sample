@@ -5,6 +5,9 @@ import { OutletsPage } from '../src/pages/OutletsPage';
 import { OUTLETS_FIXTURE } from './menu-fixture';
 import { fakeClient, renderWithProviders } from './render';
 
+// The page is tested on tiles, whatever photos have been generated since.
+vi.mock('../src/images/manifest', () => ({ AVAILABLE_IMAGES: new Set<string>() }));
+
 const LONG = 'Thebestlittleseasidegrillandjuicebarinthewholeofthegreatermaleregion';
 
 function renderHome(outlets = OUTLETS_FIXTURE) {
@@ -55,5 +58,11 @@ describe('OutletsPage', () => {
     const heading = await screen.findByRole('heading', { name: LONG });
     expect(heading).toHaveAttribute('title', LONG);
     expect(heading.className).toContain('truncate');
+  });
+
+  it('says that this key has no restaurants when the API returns none', async () => {
+    renderHome([]);
+    expect(await screen.findByText(/No restaurants are available to this key yet/)).toBeInTheDocument();
+    expect(screen.queryByText(/No restaurant matches/)).toBeNull();
   });
 });

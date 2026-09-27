@@ -41,7 +41,7 @@ describe('OrderPage', () => {
     track('Marine Drive');
     renderOrder(fakeClient({ getOrder: vi.fn(async () => order('pending')) }));
     expect(await screen.findByTestId('status-title')).toHaveTextContent('Waiting for Marine Drive to accept');
-    expect(screen.getByText('SO-10001 · your reference DEMO-1')).toBeInTheDocument();
+    expect(screen.getByText('Marine Drive · SO-10001 · your reference DEMO-1')).toBeInTheDocument();
   });
 
   it('cancels a pending order with the reason and one idempotency key, and shows the result', async () => {
@@ -55,7 +55,8 @@ describe('OrderPage', () => {
     expect(cancelOrder).toHaveBeenCalledWith('order-1', 'Customer cancelled', expect.stringMatching(/^[0-9a-f-]{36}$/));
     expect(screen.getByText(/final status/i)).toBeInTheDocument();
     expect(screen.getByTestId('status-title')).toHaveTextContent('Cancelled');
-    expect(screen.getByText('by you · Partner: Customer cancelled')).toBeInTheDocument();
+    expect(screen.getByText('by you · Customer cancelled')).toBeInTheDocument();
+    expect(screen.getByText('SO-10001 · your reference DEMO-1')).toBeInTheDocument();
     expect(steps().getAllByRole('listitem')).toHaveLength(2);
     expect(steps().getByText('Cancelled').closest('li')).toHaveAttribute('aria-current', 'step');
   });
@@ -101,5 +102,12 @@ describe('OrderPage', () => {
     renderOrder(fakeClient({ getOrder: vi.fn(async () => order('pending')) }), 'local');
     expect(await screen.findByTestId('order-status')).toHaveTextContent('pending');
     expect(screen.queryByRole('region', { name: /restaurant simulator/i })).toBeNull();
+  });
+
+  it('names the restaurant while the order is being prepared', async () => {
+    track('Marine Drive');
+    renderOrder(fakeClient({ getOrder: vi.fn(async () => order('preparing')) }));
+    expect(await screen.findByTestId('status-title')).toHaveTextContent('Being prepared');
+    expect(screen.getByText('Marine Drive · SO-10001 · your reference DEMO-1')).toBeInTheDocument();
   });
 });

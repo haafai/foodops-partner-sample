@@ -26,7 +26,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const menuMatch = useMatch('/outlets/:outletId/menu');
   const [cartOpen, setCartOpen] = useState(false);
-  useEffect(() => { setCartOpen(false); }, [location.pathname]);
+  // A new page starts at its top, with the cart closed.
+  useEffect(() => {
+    setCartOpen(false);
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   const outletName = menuMatch
     ? outlets.data?.find((o) => o.outletId === menuMatch.params.outletId)?.name ?? null
@@ -35,8 +39,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen pb-20 md:pb-0">
-      <header className="sticky top-0 z-40 border-b border-sand bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-2">
+      {/* No filter, backdrop filter or transform on the header: any of them would make it the containing block
+          of the fixed tab bar inside it, and the bar would land on the header instead of the bottom of the screen. */}
+      <header className="sticky top-0 z-40 border-b border-sand bg-white">
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
           <Link to="/outlets" aria-label="Kaana home"><Wordmark /></Link>
           {outletName && <span className="chip min-w-0 truncate" data-testid="outlet-chip" title={outletName}>{outletName}</span>}
           <span className="flex-1" />
@@ -47,7 +53,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavLink to="/orders" className={tab}><OrdersIcon />Orders</NavLink>
             <button type="button" className={tab({ isActive: cartOpen })} onClick={() => setCartOpen(true)}
               aria-label={count > 0 ? `Cart, ${count} ${count === 1 ? 'item' : 'items'}` : 'Cart'}>
-              <span className="relative">
+              <span className={`relative ${count > 0 ? 'md:mr-2.5' : ''}`}>
                 <CartIcon />
                 {count > 0 && <span data-testid="cart-badge" className="absolute -right-2.5 -top-1.5 rounded-full bg-mustard px-1.5 text-[10px] font-bold text-navy">{count}</span>}
               </span>

@@ -70,4 +70,62 @@ describe('Sheet', () => {
     expect(await screen.findByRole('button', { name: 'Re-render 1' })).toBeInTheDocument();
     expect(note).toHaveFocus();
   });
+
+  function TwoSheets() {
+    const [first, setFirst] = useState(false);
+    const [second, setSecond] = useState(false);
+    return (
+      <div>
+        <button type="button" onClick={() => setFirst(true)}>Open first</button>
+        <Sheet open={first} label="First" onClose={() => setFirst(false)}>
+          <button type="button" onClick={() => setSecond(true)}>Open second</button>
+        </Sheet>
+        <Sheet open={second} label="Second" onClose={() => setSecond(false)}>
+          <button type="button" onClick={() => setFirst(false)}>Close the first</button>
+        </Sheet>
+      </div>
+    );
+  }
+
+  it('keeps Tab and Shift+Tab inside the sheet', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Open extras' }));
+    const dialog = screen.getByRole('dialog', { name: 'Extras' });
+    await user.tab({ shift: true });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(screen.getByLabelText('Note')).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Close Extras' })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByLabelText('Note')).toHaveFocus();
+  });
+
+  it('closes only the top sheet on Escape', async () => {
+    const user = userEvent.setup();
+    render(<TwoSheets />);
+    await user.click(screen.getByRole('button', { name: 'Open first' }));
+    await user.click(screen.getByRole('button', { name: 'Open second' }));
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog', { name: 'First' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Second' })).toBeNull();
+    expect(document.body.style.overflow).toBe('hidden');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('unlocks the page whichever sheet closes first', async () => {
+    const user = userEvent.setup();
+    render(<TwoSheets />);
+    await user.click(screen.getByRole('button', { name: 'Open first' }));
+    await user.click(screen.getByRole('button', { name: 'Open second' }));
+    await user.click(screen.getByRole('button', { name: 'Close the first' }));
+    expect(screen.queryByRole('dialog', { name: 'First' })).toBeNull();
+    expect(document.body.style.overflow).toBe('hidden');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+  });
 });
