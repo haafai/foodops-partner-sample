@@ -1,30 +1,41 @@
-import { Link, Navigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { ErrorNotice } from '../components/ErrorNotice';
+import { RestaurantCard } from '../components/RestaurantCard';
 import { useSession } from '../config/SessionProvider';
+import { heroImage } from '../images/catalog';
 import { useOutlets } from '../menu/useOutlets';
 
 export function OutletsPage() {
   const { client } = useSession();
   const query = useOutlets();
+  const [filter, setFilter] = useState('');
   if (!client) return <Navigate to="/setup" replace />;
-  if (query.isPending) return <p className="p-4">Loading outlets…</p>;
+  if (query.isPending) return <p className="p-4 text-muted">Finding restaurants…</p>;
   if (query.isError) return <div className="p-4"><ErrorNotice error={query.error} /></div>;
+
+  const needle = filter.trim().toLowerCase();
+  const shown = needle ? query.data.filter((outlet) => outlet.name.toLowerCase().includes(needle)) : query.data;
+  const hero = heroImage();
+  const backdrop = hero
+    ? { backgroundImage: `linear-gradient(rgba(11,31,68,.78), rgba(11,31,68,.78)), url(${hero})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+    : undefined;
+
   return (
-    <div className="mx-auto max-w-3xl space-y-3 p-4">
-      <h1 className="text-xl font-semibold">Restaurants taking your orders</h1>
-      {query.data.map((outlet) => (
-        <article key={outlet.outletId} className="rounded border bg-white p-3">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="font-medium">{outlet.name}</h2>
-            <span className={`rounded px-2 py-0.5 text-xs ${outlet.acceptingOrders ? 'bg-emerald-100 text-emerald-900' : 'bg-slate-200 text-slate-700'}`}>
-              {outlet.acceptingOrders ? 'Accepting orders' : 'Not accepting orders'}
-            </span>
-          </div>
-          <p className="text-sm text-slate-600">{[outlet.address, outlet.phone].filter(Boolean).join(' · ')}</p>
-          <p className="text-xs text-slate-500">Auto-reject after {outlet.acceptTimeoutMinutes} min without an answer</p>
-          <Link to={`/outlets/${outlet.outletId}/menu`} className="mt-2 inline-block text-sm underline">View menu</Link>
-        </article>
-      ))}
+    <div className="space-y-5 p-4">
+      <section className="card overflow-hidden bg-navy text-white" style={backdrop}>
+        <div className="space-y-3 p-6">
+          <h1 className="text-3xl font-bold text-mustard">Hungry? Kaana's got you.</h1>
+          <p className="text-sm text-white/80">Restaurants taking your orders, with the prices they set for you.</p>
+          <label className="block">
+            <span className="sr-only">Find a restaurant</span>
+            <input type="search" className="field" placeholder="Find a restaurant" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          </label>
+        </div>
+      </section>
+      {shown.length === 0
+        ? <p className="p-6 text-center text-muted">No restaurant matches “{filter.trim()}”.</p>
+        : <div className="grid gap-4 sm:grid-cols-2">{shown.map((outlet) => <RestaurantCard key={outlet.outletId} outlet={outlet} />)}</div>}
     </div>
   );
 }
