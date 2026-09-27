@@ -16,6 +16,10 @@ The demo is a development and demonstration tool only: it keeps the key in the b
 from the page. A production integration calls the API from your server, where the key lives in a secret store.
 Browser-to-API calls also require the API to allow the page's origin, which a real restaurant API may not.
 
+The demo wears a fictional brand, "Kaana", so that it reads as a consumer ordering app; no such company exists.
+The pictures under `apps/demo/public/images` are AI-generated for this sample, and until they are generated
+every picture is a tile with the item's initials.
+
 The contract this targets is pinned in [`CONTRACT.md`](CONTRACT.md). The walkthrough is
 [`docs/integration-guide.md`](docs/integration-guide.md).
 
