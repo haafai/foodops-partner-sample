@@ -37,7 +37,7 @@ export function MenuPage() {
       <div className="min-w-0 space-y-4">
         <header className="card overflow-hidden">
           <div className="relative">
-            <DishImage src={outletImageFor({ name: outletName })} name={outletName} className="h-40 w-full text-5xl" />
+            <DishImage src={outletImageFor({ name: outletName })} name={outletName} className="h-40 w-full pb-12 text-3xl" />
             <div className="absolute inset-0 flex items-end bg-gradient-to-t from-navy/80 to-transparent p-4">
               <h1 className="truncate text-2xl font-bold text-white" title={outletName}>{outletName}</h1>
             </div>
