@@ -3,11 +3,14 @@ import type { FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { redactKey } from '@foodops-partner/client';
 import { useCart } from '../cart/CartProvider';
+import { NOTICE_BOX } from '../components/ErrorNotice';
+import { Wordmark } from '../components/Wordmark';
+import { MODE_INFO } from '../config/modeInfo';
 import { useSession } from '../config/SessionProvider';
 import { normaliseBaseUrl, validateSettings } from '../config/settings';
 
 export function SetupPage() {
-  const { settings, update } = useSession();
+  const { settings, mode, client, update } = useSession();
   const navigate = useNavigate();
   const cart = useCart();
   const [baseUrl, setBaseUrl] = useState(settings.baseUrl);
@@ -27,23 +30,32 @@ export function SetupPage() {
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto max-w-lg space-y-4 p-4">
-      <h1 className="text-xl font-semibold">Connect to a restaurant</h1>
-      <p className="text-sm text-slate-600">
-        The restaurant gives you a base URL and a key. Test keys start with <code>hbk_test_</code>; live keys with <code>hbk_live_</code> and only ever travel over https.
-      </p>
-      <label className="block text-sm">
-        <span className="font-medium">Base URL</span>
-        <input className="mt-1 w-full rounded border px-2 py-1" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://127.0.0.1:4010" />
-      </label>
-      <label className="block text-sm">
-        <span className="font-medium">API key</span>
-        <input className="mt-1 w-full rounded border px-2 py-1" type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-          placeholder={settings.apiKey ? `Keep current key ${redactKey(settings.apiKey)}` : 'hbk_test_…'} />
-      </label>
-      {settings.apiKey && <p className="text-xs text-slate-500">Current key: {redactKey(settings.apiKey)}</p>}
-      {problem && <div role="alert" className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900">{problem}</div>}
-      <button type="submit" className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white">Save and continue</button>
-    </form>
+    <div className="p-4">
+      <form onSubmit={submit} className="card mx-auto max-w-lg space-y-4 p-6">
+        <Wordmark />
+        <h1 className="text-2xl font-bold">Connect to a restaurant</h1>
+        <p className="text-sm text-muted">
+          The restaurant gives you a base URL and a key. Test keys start with <code>hbk_test_</code>; live keys with <code>hbk_live_</code> and only ever travel over https.
+        </p>
+        <label className="block text-sm">
+          <span className="font-semibold">Base URL</span>
+          <input className="field" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder="http://127.0.0.1:4010" />
+        </label>
+        <label className="block text-sm">
+          <span className="font-semibold">API key</span>
+          <input className="field" type="password" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
+            placeholder={settings.apiKey ? `Keep current key ${redactKey(settings.apiKey)}` : 'hbk_test_…'} />
+        </label>
+        {settings.apiKey && <p className="text-xs text-muted">Current key: {redactKey(settings.apiKey)}</p>}
+        {/* Only once a key is saved: before that there is no API to describe. */}
+        {client && (
+          <p className="dev-card" data-testid="mode-sentence">
+            <span className="font-bold text-navy">{MODE_INFO[mode].label}.</span> {MODE_INFO[mode].hint}
+          </p>
+        )}
+        {problem && <div role="alert" className={NOTICE_BOX}>{problem}</div>}
+        <button type="submit" className="btn-primary w-full">Save and continue</button>
+      </form>
+    </div>
   );
 }

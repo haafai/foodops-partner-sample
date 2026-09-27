@@ -81,4 +81,16 @@ describe('SetupPage', () => {
     expect(screen.getByTestId('cart-lines')).toHaveTextContent('0');
     expect(screen.getByTestId('cached-queries')).toHaveTextContent('0');
   });
+
+  it('spells out the mode on the card once a key is saved, and keeps the key redacted', () => {
+    renderWithProviders(<SetupPage />, { route: '/setup', mode: 'local' });
+    expect(screen.getByTestId('mode-sentence')).toHaveTextContent('Local. Talking to a local or test API with a test key.');
+    expect(document.body.textContent).toContain('hbk_test_mockfull0001_…');
+    expect(document.body.textContent).not.toContain('fullscopes');
+  });
+
+  it('says nothing about the mode before a key is saved', () => {
+    renderSetup();
+    expect(screen.queryByTestId('mode-sentence')).toBeNull();
+  });
 });

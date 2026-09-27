@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router-dom';
@@ -86,5 +86,29 @@ describe('CheckoutPage', () => {
     renderCheckout(createOrder);
     await user.click(screen.getByRole('button', { name: /place order/i }));
     expect(await screen.findByRole('link', { name: /open the existing order/i })).toHaveAttribute('href', '/orders/order-1');
+  });
+
+  it('lists each line with its picture, modifiers, note and total', () => {
+    const line = lineFromSelection(CLASSIC, CLASSIC.variants[0], [{ modifierId: 'm-cheese', quantity: 2 }], 2, 'no onions');
+    renderWithProviders(
+      <Routes><Route path="/checkout" element={<CheckoutPage />} /></Routes>,
+      { client: fakeClient(), route: '/checkout', cart: { outlet: cart.outlet, lines: [line] } },
+    );
+    expect(screen.getByRole('heading', { name: 'Checkout · Marine Drive' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Your order' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "Who's this for?" })).toBeInTheDocument();
+    const item = screen.getByText('2 × Classic Burger (Regular)').closest('li')!;
+    expect(within(item).getByRole('img', { name: 'Classic Burger' })).toBeInTheDocument();
+    expect(item).toHaveTextContent('2 × Cheese');
+    expect(item).toHaveTextContent('no onions');
+    expect(item).toHaveTextContent('238.00');
+    expect(screen.getByText('Estimate, sent as partnerTotal').closest('p')).toHaveTextContent('238.00');
+  });
+
+  it('keeps the retry key in a developer card with its explanation', () => {
+    renderCheckout(vi.fn());
+    const card = screen.getByText('Developer: retry key').closest('section')!;
+    expect(within(card).getByTestId('idempotency-key').textContent).toMatch(/^[0-9a-f-]{36}$/);
+    expect(card).toHaveTextContent('A retry after a failure sends this same key');
   });
 });

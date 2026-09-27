@@ -8,9 +8,13 @@ import { newPartnerReference, requestFingerprint, toCreateRequest } from '../car
 import type { CheckoutForm } from '../cart/checkout';
 import { keyFor } from '../cart/idempotency';
 import type { KeyedRequest } from '../cart/idempotency';
+import { DishImage } from '../components/DishImage';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { useSession } from '../config/SessionProvider';
+import { dishImageFor } from '../images/catalog';
 import { saveTracked } from '../orders/orderStore';
+
+const link = 'font-semibold underline decoration-mustard decoration-2 underline-offset-4';
 
 export function CheckoutPage() {
   const { client } = useSession();
@@ -30,7 +34,11 @@ export function CheckoutPage() {
 
   if (!client) return <Navigate to="/setup" replace />;
   if (!cart.outletId || cart.lines.length === 0) {
-    return <p className="p-4">Your cart is empty. <Link to="/outlets" className="underline">Pick a restaurant.</Link></p>;
+    return (
+      <div className="p-4">
+        <p className="card mx-auto max-w-lg p-6 text-center">Your cart is empty. <Link to="/outlets" className={link}>Pick a restaurant.</Link></p>
+      </div>
+    );
   }
 
   const field = (key: keyof CheckoutForm) => (event: { target: { value: string } }) => setForm((f) => ({ ...f, [key]: event.target.value }));
@@ -65,44 +73,54 @@ export function CheckoutPage() {
   const duplicateId = error instanceof PartnerApiError && error.code === 'duplicate_order' ? String(error.details?.orderId ?? '') : '';
 
   return (
-    <form onSubmit={submit} className="mx-auto grid max-w-3xl gap-4 p-4 md:grid-cols-2">
-      {/* Disabled while the order is in flight: an edit mid-request would change the key under a live attempt. */}
-      <fieldset disabled={busy} className="min-w-0">
-        <section className="space-y-3">
-          <h1 className="text-xl font-semibold">Checkout · {cart.outletName}</h1>
-          <label className="block text-sm"><span className="font-medium">Your reference</span>
-            <input className="mt-1 w-full rounded border px-2 py-1" value={form.partnerReference} onChange={field('partnerReference')} maxLength={64} /></label>
-          <label className="block text-sm"><span className="font-medium">Customer name</span>
-            <input className="mt-1 w-full rounded border px-2 py-1" value={form.customerName} onChange={field('customerName')} maxLength={100} /></label>
-          <label className="block text-sm"><span className="font-medium">Customer phone</span>
-            <input className="mt-1 w-full rounded border px-2 py-1" value={form.customerPhone} onChange={field('customerPhone')} maxLength={32} /></label>
-          <label className="block text-sm"><span className="font-medium">Order notes</span>
-            <textarea className="mt-1 w-full rounded border px-2 py-1" value={form.notes} onChange={field('notes')} maxLength={500} /></label>
-          <label className="block text-sm"><span className="font-medium">Pickup time (optional)</span>
-            <input type="datetime-local" className="mt-1 w-full rounded border px-2 py-1" value={form.expectedPickupAt} onChange={field('expectedPickupAt')} /></label>
-        </section>
-      </fieldset>
-      <fieldset disabled={busy} className="min-w-0">
-        <section className="space-y-3">
-          <h2 className="font-semibold">Order</h2>
-          <ul className="space-y-1 text-sm">
+    <form onSubmit={submit} className="mx-auto max-w-3xl space-y-4 p-4">
+      <h1 className="truncate text-2xl font-bold" title={cart.outletName ?? undefined}>Checkout · {cart.outletName}</h1>
+      <div className="grid items-start gap-4 md:grid-cols-2">
+        <section className="card p-4">
+          <h2 className="text-lg font-semibold">Your order</h2>
+          <ul className="mt-3 space-y-3 text-sm">
             {cart.lines.map((line) => (
-              <li key={line.lineId} className="flex justify-between"><span>{line.quantity} × {line.itemName} ({line.variantName})</span><span>{lineTotal(line).toFixed(2)}</span></li>
+              <li key={line.lineId} className="flex items-start gap-3">
+                <DishImage src={dishImageFor({ name: line.itemName, imageUrl: null })} name={line.itemName} className="h-12 w-12 shrink-0 rounded-xl text-sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{line.quantity} × {line.itemName} ({line.variantName})</p>
+                  {line.modifiers.length > 0 && <p className="text-xs text-muted">{line.modifiers.map((m) => `${m.quantity} × ${m.name}`).join(', ')}</p>}
+                  {line.note && <p className="text-xs italic text-muted">{line.note}</p>}
+                </div>
+                <span className="font-semibold">{lineTotal(line).toFixed(2)}</span>
+              </li>
             ))}
           </ul>
-          <p className="flex justify-between border-t pt-2 text-sm font-medium"><span>Estimate, sent as partnerTotal</span><span>{estimateTotal(cart.lines).toFixed(2)}</span></p>
-          <div className="rounded border bg-slate-100 p-3 text-xs text-slate-700">
-            <p className="font-medium">Retry key</p>
-            <p className="break-all font-mono" data-testid="idempotency-key">{keyed.key}</p>
+          <p className="mt-4 flex justify-between border-t border-sand pt-3 font-bold"><span>Estimate, sent as partnerTotal</span><span>{estimateTotal(cart.lines).toFixed(2)}</span></p>
+          <p className="text-xs text-muted">The restaurant's total is the one that counts.</p>
+        </section>
+        {/* Disabled while the order is in flight: an edit mid-request would change the key under a live attempt. */}
+        <fieldset disabled={busy} className="min-w-0 space-y-4">
+          <section className="card space-y-3 p-4">
+            <h2 className="text-lg font-semibold">Who's this for?</h2>
+            <label className="block text-sm"><span className="font-semibold">Your reference</span>
+              <input className="field" value={form.partnerReference} onChange={field('partnerReference')} maxLength={64} /></label>
+            <label className="block text-sm"><span className="font-semibold">Customer name</span>
+              <input className="field" value={form.customerName} onChange={field('customerName')} maxLength={100} /></label>
+            <label className="block text-sm"><span className="font-semibold">Customer phone</span>
+              <input className="field" value={form.customerPhone} onChange={field('customerPhone')} maxLength={32} /></label>
+            <label className="block text-sm"><span className="font-semibold">Order notes</span>
+              <textarea className="field" value={form.notes} onChange={field('notes')} maxLength={500} /></label>
+            <label className="block text-sm"><span className="font-semibold">Pickup time (optional)</span>
+              <input type="datetime-local" className="field" value={form.expectedPickupAt} onChange={field('expectedPickupAt')} /></label>
+          </section>
+          <section className="dev-card">
+            <p className="font-bold text-navy">Developer: retry key</p>
+            <p className="break-all font-mono text-navy" data-testid="idempotency-key">{keyed.key}</p>
             <p className="mt-1">Minted when this checkout opened. Change anything above and a new one appears. A retry after a failure sends this same key, so the restaurant replays the order instead of making a second one.</p>
-          </div>
+          </section>
           <ErrorNotice error={error} />
-          {duplicateId && <Link to={`/orders/${duplicateId}`} className="block text-sm underline">Open the existing order</Link>}
-          <button type="submit" disabled={busy} className="w-full rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+          {duplicateId && <Link to={`/orders/${duplicateId}`} className={`block text-sm ${link}`}>Open the existing order</Link>}
+          <button type="submit" disabled={busy} className="btn-primary w-full">
             {busy ? 'Placing…' : failedFingerprint === fingerprint ? 'Try again with the same key' : 'Place order'}
           </button>
-        </section>
-      </fieldset>
+        </fieldset>
+      </div>
     </form>
   );
 }
