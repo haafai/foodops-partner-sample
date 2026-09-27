@@ -21,9 +21,27 @@ export const CHICKEN: PartnerMenuItem = {
   ] }],
 };
 
+export const VEGGIE: PartnerMenuItem = {
+  productId: 'p-veggie', name: 'Veggie Burger', description: 'Chickpea patty.', imageUrl: null,
+  variants: [{ variantId: 'v-veggie-r', name: 'Regular', price: 85, available: true }],
+  modifierGroups: [],
+};
+
+export const SOLD_OUT: PartnerMenuItem = {
+  productId: 'p-soldout', name: 'Lobster Roll', description: null, imageUrl: null,
+  variants: [{ variantId: 'v-lobster-r', name: 'Regular', price: 250, available: false }],
+  modifierGroups: [],
+};
+
+export const NO_VARIANTS: PartnerMenuItem = {
+  productId: 'p-novariants', name: 'Mystery Special', description: null, imageUrl: null,
+  variants: [],
+  modifierGroups: [],
+};
+
 export const MENU_FIXTURE: PartnerMenu = {
   outletId: 'o-marine', currency: 'MVR', pricesIncludeTax: true, partnerPriceList: { id: 'pl', name: 'Partner +15%' },
-  version: 'abc123def456', categories: [{ id: 'c-burgers', name: 'Burgers', sortOrder: 1, items: [CLASSIC, CHICKEN] }],
+  version: 'abc123def456', categories: [{ id: 'c-burgers', name: 'Burgers', sortOrder: 1, items: [CLASSIC, CHICKEN, VEGGIE] }],
 };
 
 export const OUTLETS_FIXTURE = [
