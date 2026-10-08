@@ -5,10 +5,11 @@ connect to restaurants running FoodOps. It contains:
 
 | Part | What it is | Copy it? |
 |---|---|---|
-| `packages/client` | A dependency-free TypeScript client: five calls, one error type, a retry helper. | Yes, this is the point. |
+| `packages/client` | A dependency-free TypeScript client: eight calls, one error type, a retry helper, and the webhook signature check. | Yes, this is the point. |
+| `packages/webhook-receiver` | A small server that takes the restaurant's events: verifies each signature, answers at once, ignores repeats. | Yes: the handler is the part to copy. |
 | `packages/mock-server` | A mock of the API that follows the contract rule for rule, with a simulated restaurant under `/_mock/`. | Run it; do not ship it. |
 | `apps/demo` | A small ordering app: outlets, menu with your prices, cart, checkout, live tracking, cancel. | Read it for the patterns. |
-| `apps/scenarios` | Twenty-one named checks you can point at any base URL, including a real restaurant with a test key. | Run it before going live. |
+| `apps/scenarios` | Twenty-five named checks you can point at any base URL, including a real restaurant with a test key. | Run it before going live. |
 
 ## What the demo is, and is not
 
@@ -30,12 +31,16 @@ Needs Node 22.
 ```bash
 npm install
 npm run mock            # the mock API on http://127.0.0.1:4010, with four built-in test keys
+npm run receiver        # the webhook receiver: deliveries on :4020, local control on :4021
 npm run dev             # the demo on http://localhost:5180
 npm run scenarios -- --base-url http://127.0.0.1:4010 --key hbk_test_mockfull0001_fullscopes
 ```
 
 In the demo's Setup screen, enter the mock URL and the key `hbk_test_mockfull0001_fullscopes`. Place an order,
 then use the restaurant simulator on the tracking page to accept, advance, reject or time it out.
+
+To see events instead of polling, press **Register webhook** on the Setup screen while the receiver is running.
+The tracking page then says "Live by webhook" and each simulator button reaches it through a signed event.
 
 The demo can also be pre-filled from `VITE_PARTNER_API_BASE_URL` and `VITE_PARTNER_API_KEY`. Vite inlines
 `VITE_` variables into the built bundle, so `VITE_PARTNER_API_KEY` is for local development only: never set it
@@ -54,6 +59,31 @@ npm run scenarios       # reads the root .env; scenarios that need the simulator
 ```
 
 Run the scenarios against a test restaurant, never a live one: they place and cancel real orders.
+
+## Webhooks
+
+The restaurant posts a signed event to a URL you register when one of your orders changes status or an outlet's
+menu changes. Registering is one call with your key (`client.setWebhook(url)`); the answer carries the signing
+secret, once. Every registration issues a new secret and the old one stops at once. A key restricted to some
+outlets cannot register a webhook. There is no retry and no ordering guarantee, so a webhook is a prompt and a
+slow poll stays as the backstop. The whole contract, with a test vector, is in [`CONTRACT.md`](CONTRACT.md#webhooks).
+
+`packages/webhook-receiver` is the reference. It listens on two ports on purpose:
+
+| Port | Serves | Who may reach it |
+|---|---|---|
+| 4020 | `POST /webhooks/foodops`, nothing else | The internet, through your proxy or tunnel. Every request must carry a valid signature. |
+| 4021 | `/_receiver/*`: hand over the secret, read what arrived | This machine only. It has no login, so never expose it. |
+
+A real restaurant's API only calls an `https` URL on a public host, port 443, and refuses anything that resolves
+to a private address. To receive from one on your own machine, put a tunnel in front of port 4020 and register
+the tunnel's `https` address with `/webhooks/foodops` on the end. The mock is the one exception: it accepts
+`http://127.0.0.1:4020/webhooks/foodops` so the two can talk without a tunnel.
+
+The receiver keeps the secret in memory. Restart it and it refuses every delivery until you register again
+(which issues a new secret), or start it with `PARTNER_WEBHOOK_SECRET` set. In the demo the secret passes through
+the page on its way from the API to the receiver, because the demo holds the key in the browser; in production
+your server makes the `PUT` and the secret never leaves it.
 
 ## Development
 
@@ -89,4 +119,18 @@ if (!variantId) throw new Error('Nothing simple to order on this menu.');
 const key = newIdempotencyKey();          // mint BEFORE the first attempt…
 const created = await withRetry(() =>     // …and reuse it on every retry
   client.createOrder({ outletId: outlet.outletId, partnerReference: 'PX-88213', lines: [{ variantId, quantity: 1 }] }, key));
+```
+
+Receiving an event, in any server that gives you the raw body:
+
+```ts
+import { isOrderEvent, parseWebhookEnvelope, verifyWebhookSignature } from '@foodops-partner/client';
+
+// rawBody: the bytes exactly as they arrived. Do NOT pass a parsed-and-re-serialised body.
+const verdict = await verifyWebhookSignature({ secret: process.env.PARTNER_WEBHOOK_SECRET!, header: request.headers.get('hubits-signature'), rawBody });
+if (!verdict.ok) return new Response(null, { status: 401 });
+const event = parseWebhookEnvelope(rawBody);
+if (!event) return new Response(null, { status: 400 });
+if (!(await alreadySeen(event.id)) && isOrderEvent(event)) await queueStatusChange(event.data.orderId, event.data.status, event.createdAt);
+return new Response(null, { status: 200 });   // answer first; do the slow work from your queue
 ```
