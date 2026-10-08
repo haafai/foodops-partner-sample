@@ -75,6 +75,14 @@ slow poll stays as the backstop. The whole contract, with a test vector, is in [
 | 4020 | `POST /webhooks/foodops`, nothing else | The internet, through your proxy or tunnel. Every request must carry a valid signature. |
 | 4021 | `/_receiver/*`: hand over the secret, read what arrived | This machine only. It has no login, so never expose it. |
 
+The control port answers a request only when it was addressed to a loopback name (`localhost`, `127.0.0.1`) and, if
+it comes from a web page, only when that page is on its list: by default the demo's two addresses on port 5180.
+If the demo starts on another port because 5180 is taken, the Setup screen reports that no receiver is answering:
+the receiver refused the page with `403 origin_not_allowed`, and a browser shows such a refusal as no answer at
+all. Set `WEBHOOK_ALLOWED_ORIGINS` in `.env` to the address the demo printed (comma-separated for several) and
+restart the receiver. **Never put a tunnel in front of the control port.** A tunnel that rewrites the `Host` header
+to `localhost` would defeat that check and hand the whole internet the route that sets the secret.
+
 A real restaurant's API only calls an `https` URL on a public host, port 443, and refuses anything that resolves
 to a private address. To receive from one on your own machine, put a tunnel in front of port 4020 and register
 the tunnel's `https` address with `/webhooks/foodops` on the end. The mock is the one exception: it accepts
@@ -134,3 +142,7 @@ if (!event) return new Response(null, { status: 400 });
 if (!(await alreadySeen(event.id)) && isOrderEvent(event)) await queueStatusChange(event.data.orderId, event.data.status, event.createdAt);
 return new Response(null, { status: 200 });   // answer first; do the slow work from your queue
 ```
+
+Each restaurant issues its own secret, so with many restaurants give each one its own URL (a path segment you
+mint, such as `/webhooks/foodops/7f3a9c…`) and look the secret up from it before you verify. The sample receiver
+serves one key, so it holds one secret.

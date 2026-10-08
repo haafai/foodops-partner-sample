@@ -98,7 +98,8 @@ one when you click "Try again with the same key".
 | `invalid_webhook_url` | The URL must be https on a public host, port 443, with no user or password (section 6). |
 | `invalid_events` | Send `["order"]`, `["menu"]`, both, or leave `events` out. |
 | `invalid_api_key`, `partner_key_required`, `insufficient_scope`, `endpoint_not_available`, `ip_not_allowed`, `quota_exceeded` | A setup problem. Stop and talk to the restaurant. |
-| `not_found` | The outlet or order is not yours or no longer exists. Refresh your outlet list. |
+| `outlet_restricted_key` | A key restricted to some outlets cannot register a webhook. Ask the restaurant for a key without that restriction, or keep polling. |
+| `not_found` | The outlet or order is not yours or no longer exists; refresh your outlet list. On `GET webhook` it means none is set, and on `PUT webhook` that this API does not offer webhooks. |
 | `duplicate_order` | You already placed this reference at this outlet today; the body carries `orderId`. Open that order. |
 | `outlet_closed` | The till is closed; nothing was queued. Tell the customer; try later. |
 | `outlet_not_accepting` | Online ordering is paused at that outlet. |
@@ -117,7 +118,9 @@ You can learn about changes in two ways, and a good integration uses both.
 (`client.setWebhook('https://hooks.example.com/webhooks/foodops')`). The restaurant's API then posts a small signed
 event there when one of your orders is accepted, started, ready, picked up, rejected or cancelled, and when an
 outlet's menu changes for you. Your key needs the `partner.webhook` scope. A key restricted to some outlets cannot
-register a webhook: `PUT` answers `403`.
+register a webhook: `PUT` answers `403 outlet_restricted_key`. Each restaurant has its own secret, so when you
+serve many, give each restaurant its own URL (a path segment you mint) and look the secret up from it; the sample
+receiver serves one key and holds one secret.
 
 1. **Store the secret from the `PUT` answer before anything else.** It is shown once. Every later `PUT` issues a
    new one and the old one stops at once, so a rotation is: `PUT`, store, done. Events signed with the new secret
@@ -135,8 +138,8 @@ register a webhook: `PUT` answers `403`.
    move an order out of a final status. Times are ISO-8601 UTC with up to seven fractional digits and trailing
    zeros dropped, so parse both `2026-10-08T09:12:44Z` and `2026-10-08T09:12:44.1234567Z`.
 5. **On `menu.updated`, re-fetch that outlet's menu with `If-None-Match`**, exactly as in section 2. The event carries
-   only the outlet and the new `version`. If the answer is still your old version, the API served its one-minute
-   copy: ask once more a minute later.
+   only the outlet and the new `version`. Rarely, the answer is still your old version: the API served its
+   one-minute copy. Ask once more a minute later.
 6. **Keep the URL public and boring.** `https`, port 443, a host that resolves only to public addresses. Expose the
    one route that takes deliveries and nothing else; the sample receiver puts its own control routes on a second
    port for that reason.
@@ -152,7 +155,9 @@ restarting, the network dropped it. Nothing is sent twice. A webhook is a prompt
 
 Stop polling an order at a final status either way. `GET webhook` shows the last delivery and how many have failed
 in a row; when that number climbs, your endpoint is the problem and polling is carrying you. Fall back to the
-left-hand column until it is fixed.
+left-hand column until it is fixed. Check it on a timer, not only at start-up: an endpoint that is running and
+holds a secret can still be unreachable. The demo re-reads `GET webhook` every minute while its webhook is
+registered and calls the webhook working only while `consecutiveFailures` is `0`.
 
 ## 7. Your reference
 

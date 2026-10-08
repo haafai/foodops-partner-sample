@@ -64,14 +64,15 @@ Body `{ "error": "<code>", "message": "<text>" }` on a real status code. Some co
 |---|---|---|
 | 400 | `invalid_request` | body fails validation (adds `field`) |
 | 400 | `idempotency_key_required` | write without `Idempotency-Key` |
+| 400 | `invalid_webhook_url` | the webhook `url` breaks a URL rule below |
+| 400 | `invalid_events` | `events` is empty or names something other than `order` and `menu` |
 | 401 | `invalid_api_key` | unknown, malformed, revoked, expired, wrong environment |
 | 402 | `quota_exceeded` | the key's quota is spent |
 | 403 | `partner_key_required` | org key not bound to a delivery partner |
 | 403 | `endpoint_not_available` | the restaurant has not enabled partner ordering |
-| 400 | `invalid_webhook_url` | the webhook `url` breaks a URL rule below |
-| 400 | `invalid_events` | `events` is empty or names something other than `order` and `menu` |
 | 403 | `insufficient_scope` | missing `menu.read` / `orders.write` / `partner.webhook` |
 | 403 | `ip_not_allowed` | caller IP outside the key's allow-list |
+| 403 | `outlet_restricted_key` | `PUT webhook` with a key restricted to some outlets |
 | 404 | `not_found` | outlet or order not visible to this key; no webhook set; webhooks not offered by this API |
 | 409 | `duplicate_order` | same `partnerReference` at this outlet within 24 h (adds `orderId`) |
 | 409 | `outlet_closed` | no till is open; nothing was queued |
@@ -96,13 +97,14 @@ Body `{ "error": "<code>", "message": "<text>" }` on a real status code. Some co
 One endpoint per restaurant and delivery partner, not per key: rotating a key keeps it. `secret` is returned by
 `PUT` only. **Every `PUT` issues a new secret and the old one stops at once**; that is how it is rotated. Events
 signed before you have stored the new secret fail your check and are lost. A key restricted to some outlets
-cannot register a webhook: `PUT` answers `403`. A new endpoint receives only what happens after it was set. A
+cannot register a webhook: `PUT` answers `403 outlet_restricted_key`. A new endpoint receives only what happens after it was set. A
 replacing `PUT` keeps `createdAt`, `lastDelivery` and `consecutiveFailures`; it changes `url`, `events`,
 `updatedAt` and the secret.
 
 URL rules, checked on `PUT` and again each time an event is sent: absolute; scheme `https`; no user or password;
 port 443 or none; at most 2000 characters; every address the host resolves to is public (no loopback, private,
-link-local, shared or metadata range, IPv4 or IPv6). `events` left out means both.
+link-local, shared or metadata range, IPv4 or IPv6). `events` left out means both. In `PartnerWebhookDto`,
+`events` is always in the order `order`, `menu`, whatever order the `PUT` named them in.
 
 Times (`createdAt` on the webhook and on events, and `lastDelivery.at`) are ISO-8601 UTC ending in `Z`, with up to
 seven fractional digits and trailing zeros dropped. Accept both a fractional form (`2026-10-08T09:12:44.1234567Z`)
