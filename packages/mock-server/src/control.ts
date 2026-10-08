@@ -7,6 +7,7 @@ import type { TransitionResult } from './lifecycle';
 import { toOrderDto } from './orders';
 import type { MockState } from './state';
 import type { FaultResponse } from './snapshot';
+import { announceMenus } from './webhooks';
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const fromResult = (result: TransitionResult): JsonResponse => (result.ok ? json(200, toOrderDto(result.order)) : result.response);
@@ -34,6 +35,7 @@ export async function handleControl(state: MockState, method: string, url: URL, 
     }
     if (!findVariantFixture(body.variantId)) return error(404, 'not_found', 'No such variant.');
     state.priceOverrides.set(body.variantId, body.price);
+    announceMenus(state);
     return empty(204);
   }
   const outletMatch = /^outlets\/([^/]+)$/.exec(path);

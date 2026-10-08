@@ -1,4 +1,4 @@
-export type Scope = 'menu.read' | 'orders.write';
+export type Scope = 'menu.read' | 'orders.write' | 'partner.webhook';
 
 export interface MockKey {
   key: string;
@@ -10,10 +10,10 @@ export interface MockKey {
 
 /** The four built-in keys. They are fixtures, not secrets, so printing them is fine. */
 export const MOCK_KEYS: readonly MockKey[] = [
-  { key: 'hbk_test_mockfull0001_fullscopes', keyId: 'mockfull0001', scopes: ['menu.read', 'orders.write'], partnerBound: true, label: 'full access' },
+  { key: 'hbk_test_mockfull0001_fullscopes', keyId: 'mockfull0001', scopes: ['menu.read', 'orders.write', 'partner.webhook'], partnerBound: true, label: 'full access' },
   { key: 'hbk_test_mockmenu0001_menuonly', keyId: 'mockmenu0001', scopes: ['menu.read'], partnerBound: true, label: 'menu only' },
-  { key: 'hbk_test_mockunbd0001_unbound', keyId: 'mockunbd0001', scopes: ['menu.read', 'orders.write'], partnerBound: false, label: 'not bound to a partner' },
-  { key: 'hbk_test_mockfull0002_secondkey', keyId: 'mockfull0002', scopes: ['menu.read', 'orders.write'], partnerBound: true, label: 'full access, second key' },
+  { key: 'hbk_test_mockunbd0001_unbound', keyId: 'mockunbd0001', scopes: ['menu.read', 'orders.write', 'partner.webhook'], partnerBound: false, label: 'not bound to a partner' },
+  { key: 'hbk_test_mockfull0002_secondkey', keyId: 'mockfull0002', scopes: ['menu.read', 'orders.write', 'partner.webhook'], partnerBound: true, label: 'full access, second key' },
 ];
 export const FULL_KEY = MOCK_KEYS[0].key;
 export const MENU_ONLY_KEY = MOCK_KEYS[1].key;

@@ -10,7 +10,7 @@ beforeEach(() => handle.state.reset());
 
 const EXPECTED: Record<string, string> = {
   'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+  'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'access-control-allow-headers': 'Authorization, Content-Type, Idempotency-Key, If-None-Match',
   'access-control-expose-headers': 'ETag, Retry-After, Location, WWW-Authenticate',
   'access-control-max-age': '600',

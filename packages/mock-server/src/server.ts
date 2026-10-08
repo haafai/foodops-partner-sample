@@ -13,6 +13,7 @@ import type { Scheduler } from './scheduler';
 import type { FaultResponse } from './snapshot';
 import { MockState } from './state';
 import type { MockStateOptions } from './state';
+import { handleDeleteWebhook, handleGetWebhook, handlePutWebhook } from './webhooks';
 
 export const PARTNER_PREFIX = '/api/external/v1/partner/';
 
@@ -38,7 +39,7 @@ export function requireIdempotencyKey(req: IncomingMessage): string | JsonRespon
   return key ? key : error(400, 'idempotency_key_required', 'Send an Idempotency-Key header with every write.');
 }
 
-/** Tasks 5–7 add rows here. Order does not matter; patterns are anchored. */
+/** Order does not matter; patterns are anchored. */
 export const routes: Route[] = [
   { method: 'GET', pattern: /^outlets$/, scope: 'menu.read', handle: ({ state }) => handleListOutlets(state) },
   { method: 'GET', pattern: /^outlets\/([^/]+)\/menu$/, scope: 'menu.read', handle: ({ state, req }, m) => handleGetMenu(state, req, decodeURIComponent(m[1])) },
@@ -59,6 +60,9 @@ export const routes: Route[] = [
       return handlePartnerCancel(state, key, decodeURIComponent(m[1]), await body(), idempotencyKey);
     },
   },
+  { method: 'PUT', pattern: /^webhook$/, scope: 'partner.webhook', handle: async ({ state, key, body }) => handlePutWebhook(state, key, await body()) },
+  { method: 'GET', pattern: /^webhook$/, scope: 'partner.webhook', handle: ({ state, key }) => handleGetWebhook(state, key) },
+  { method: 'DELETE', pattern: /^webhook$/, scope: 'partner.webhook', handle: ({ state, key }) => handleDeleteWebhook(state, key) },
 ];
 
 function faultResponse(fault: FaultResponse): JsonResponse {
@@ -125,7 +129,7 @@ export interface MockServerHandle { url: string; port: number; state: MockState;
 
 /** Port 0 (the default) picks a free port, which is what tests want. `npm run mock` passes 4010. */
 export async function startMockServer(options: MockServerOptions = {}): Promise<MockServerHandle> {
-  const state = new MockState({ clock: options.clock, scheduler: options.scheduler ?? realScheduler });
+  const state = new MockState({ clock: options.clock, scheduler: options.scheduler ?? realScheduler, webhookFetch: options.webhookFetch });
   state.onOrderCreated = (orderId) => scheduleAutopilot(state, orderId);
   const server = createServer(createRequestHandler(state));
   const host = options.host ?? '127.0.0.1';
