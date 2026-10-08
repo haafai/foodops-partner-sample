@@ -31,6 +31,8 @@ export interface ScenarioContext {
   reference(name: string): string;
   pickOutlet(): Promise<PartnerOutlet>;
   pickMenu(outletId: string): Promise<PartnerMenu>;
+  /** One request made the way cleanup makes them: paced against a real API, and tried again when the failure may pass. */
+  retryPaced<T>(request: () => Promise<T>): Promise<T>;
   /** Remember an order so cleanup() can cancel it. */
   track(orderId: string): void;
   cleanup(): Promise<void>;

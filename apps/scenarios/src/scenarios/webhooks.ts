@@ -30,22 +30,46 @@ async function claim(ctx: ScenarioContext): Promise<void> {
   if (existing) throw new SkipScenario(`a webhook is already registered for this key (${new URL(existing.url).host}); not replacing it`);
 }
 
-/** PUT, or skip when the target has no webhook endpoints at all (an older API, or the feature switched off). */
+/** The answers to a PUT that mean "this target or this key cannot have a webhook": a skip, never a failure. */
+function skipIfUnavailable(error: unknown): void {
+  if (!(error instanceof PartnerApiError)) return;
+  if (error.status === 404) throw new SkipScenario('this API does not offer webhooks');
+  if (error.status === 403 && error.code === 'outlet_restricted_key') {
+    throw new SkipScenario('this key is restricted to some outlets, so it cannot register a webhook (403 outlet_restricted_key)');
+  }
+}
+
+/** PUT, or skip when the target has no webhook endpoints at all (an older API, or the feature switched off) or refuses this kind of key. */
 async function register(ctx: ScenarioContext, url: string, events?: PartnerWebhookEventName[]): Promise<PartnerWebhookRegistration> {
   try {
     return await ctx.client.setWebhook(url, events);
   } catch (error) {
-    if (error instanceof PartnerApiError && error.status === 404) throw new SkipScenario('this API does not offer webhooks');
+    skipIfUnavailable(error);
     throw error;
   }
 }
 
-async function remove(ctx: ScenarioContext): Promise<void> {
+/**
+ * DELETE, tried again when the failure may pass. Answers null once the webhook is gone, else the sentence to fail
+ * the scenario with: a webhook left behind keeps a real restaurant posting to the runner's URL.
+ */
+async function remove(ctx: ScenarioContext): Promise<string | null> {
   try {
-    await ctx.client.deleteWebhook();
+    await ctx.retryPaced(() => ctx.client.deleteWebhook());
+    return null;
   } catch (error) {
-    console.error(`cleanup: could not remove the scenario's webhook (${error instanceof PartnerApiError ? `${error.status} ${error.code}` : String(error)})`);
+    const why = error instanceof PartnerApiError ? `${error.status} ${error.code}` : String(error);
+    const leftBehind = `cleanup: the webhook this scenario registered could not be removed (${why}). `
+      + 'It is still registered and the restaurant keeps posting to it: send DELETE webhook with this key yourself.';
+    // Logged as well: when the scenario had already failed, its own failure is the one the report shows.
+    console.error(leftBehind);
+    return leftBehind;
   }
+}
+
+/** Called after the `finally` that removed the webhook: a removal that failed fails the scenario. */
+function assertRemoved(leftBehind: string | null): void {
+  if (leftBehind !== null) assert.fail(leftBehind);
 }
 
 async function waitForEvent(receiver: ReceiverHandle, match: (event: WebhookEnvelope) => boolean, what: string): Promise<WebhookEnvelope> {
@@ -70,6 +94,7 @@ export const webhookRegister: Scenario = {
     const url = ctx.webhookUrl ?? MOCK_DEAD_WEBHOOK_URL;
     // Menu events only: nothing in this scenario changes a menu, so nothing is sent to the URL while it runs.
     const first = await register(ctx, url, ['menu']);
+    let leftBehind: string | null = null;
     try {
       assert.equal(first.url, url);
       assert.deepEqual(first.events, ['menu']);
@@ -81,12 +106,14 @@ export const webhookRegister: Scenario = {
       assert.equal(read.consecutiveFailures, 0);
       assert.ok(!('secret' in read), 'GET must never return the secret');
       const second = await register(ctx, url);
-      assert.notEqual(second.secret, first.secret, 'every PUT must issue a new secret');
+      // Compared outside the assertion: a failed `notEqual` would carry both secrets on the error.
+      assert.ok(second.secret !== first.secret, 'every PUT must issue a new secret');
       assert.deepEqual(second.events, ['order', 'menu'], 'events left out means both, in contract order');
       assert.equal(second.createdAt, first.createdAt, 'replacing the endpoint keeps the same registration');
     } finally {
-      await remove(ctx);
+      leftBehind = await remove(ctx);
     }
+    assertRemoved(leftBehind);
     assert.equal(await ctx.client.getWebhook(), null, 'after DELETE, GET must answer 404');
     await ctx.client.deleteWebhook();
   },
@@ -97,9 +124,10 @@ export const webhookInvalidUrl: Scenario = {
   requires: [],
   async run(ctx) {
     await claim(ctx);
+    let leftBehind: string | null = null;
     try {
       const probe = await ctx.client.setWebhook('http://partner.example.com/hooks/foodops').catch((e: unknown) => e);
-      if (probe instanceof PartnerApiError && probe.status === 404) throw new SkipScenario('this API does not offer webhooks');
+      skipIfUnavailable(probe);
       assert.ok(probe instanceof PartnerApiError && probe.status === 400 && probe.code === 'invalid_webhook_url',
         `plain http on a public host must be refused with 400 invalid_webhook_url, got ${probe instanceof PartnerApiError ? `${probe.status} ${probe.code}` : 'a success'}`);
       await expectApiError(ctx.client.setWebhook('https://user:secret@example.com/hooks/foodops'), 400, 'invalid_webhook_url');
@@ -110,8 +138,9 @@ export const webhookInvalidUrl: Scenario = {
       assert.equal(await ctx.client.getWebhook(), null, 'a refused PUT must register nothing');
     } finally {
       // Only reached with something registered if the API wrongly accepted one of the URLs above.
-      if (await ctx.client.getWebhook().catch(() => null)) await remove(ctx);
+      if (await ctx.client.getWebhook().catch(() => null)) leftBehind = await remove(ctx);
     }
+    assertRemoved(leftBehind);
   },
 };
 
@@ -122,6 +151,7 @@ export const webhookOrderEvent: Scenario = {
     await claim(ctx);
     const receiver = await startReceiver({ webhookPort: ctx.webhookListenPort ?? 0 });
     let registered = false;
+    let leftBehind: string | null = null;
     try {
       const hook = await register(ctx, ctx.webhookUrl ?? receiver.webhookUrl, ['order']);
       registered = true;
@@ -136,9 +166,10 @@ export const webhookOrderEvent: Scenario = {
       const event = await waitForEvent(receiver, (e) => isOrderEvent(e) && e.data.orderId === created.id && e.type === 'order.cancelled', `order.cancelled for ${created.id}`);
       assert.match(event.id, /^evt_[0-9A-HJKMNP-TV-Z]{26}$/, 'the event id must be evt_ plus a ULID');
       assert.ok(Math.abs(Date.now() - Date.parse(event.createdAt)) < 5 * 60_000, `createdAt ${event.createdAt} is not near now`);
+      // Field by field: a newer API may add fields to `data`, and that must not fail an integration.
       assert.deepEqual(
-        { ...event.data, reason: undefined },
-        { orderId: created.id, partnerReference, outletId: outlet.outletId, status: 'cancelled', cancelledBy: 'partner', reason: undefined },
+        { orderId: event.data.orderId, partnerReference: event.data.partnerReference, outletId: event.data.outletId, status: event.data.status, cancelledBy: event.data.cancelledBy },
+        { orderId: created.id, partnerReference, outletId: outlet.outletId, status: 'cancelled', cancelledBy: 'partner' },
       );
       assert.ok(String(event.data.reason).includes('scenario webhook check'), `reason should carry the text, got ${String(event.data.reason)}`);
       assert.equal(receiver.state.rejected, 0, `the receiver refused a delivery: ${receiver.state.lastRejection?.reason}`);
@@ -156,9 +187,10 @@ export const webhookOrderEvent: Scenario = {
       assert.equal(last?.lastDelivery?.httpStatus, 200);
       assert.equal(last?.consecutiveFailures, 0);
     } finally {
-      if (registered) await remove(ctx);
+      if (registered) leftBehind = await remove(ctx);
       await receiver.close();
     }
+    assertRemoved(leftBehind);
   },
 };
 
@@ -169,6 +201,7 @@ export const webhookMenuEvent: Scenario = {
     await claim(ctx);
     const receiver = await startReceiver({ webhookPort: ctx.webhookListenPort ?? 0 });
     let registered = false;
+    let leftBehind: string | null = null;
     let restore: (() => Promise<void>) | undefined;
     try {
       const outlet = await ctx.pickOutlet();
@@ -186,13 +219,14 @@ export const webhookMenuEvent: Scenario = {
       const event = await waitForEvent(receiver, (e) => isMenuEvent(e) && e.data.outletId === outlet.outletId, `menu.updated for ${outlet.outletId}`);
       const after = await ctx.client.getMenu(outlet.outletId, { ifNoneMatch: before.etag });
       assert.ok(after.modified, 'the menu must have changed after the event');
-      assert.deepEqual(event.data, { outletId: outlet.outletId, version: after.menu.version }, 'the event carries the version GET menu now returns');
+      assert.deepEqual({ outletId: event.data.outletId, version: event.data.version }, { outletId: outlet.outletId, version: after.menu.version }, 'the event carries the version GET menu now returns');
       assert.notEqual(after.menu.version, before.menu.version);
       assert.equal(receiver.state.rejected, 0, `the receiver refused a delivery: ${receiver.state.lastRejection?.reason}`);
     } finally {
-      if (registered) await remove(ctx);
+      if (registered) leftBehind = await remove(ctx);
       if (restore) await restore();
       await receiver.close();
     }
+    assertRemoved(leftBehind);
   },
 };

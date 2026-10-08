@@ -137,6 +137,9 @@ export async function createContext(options: ContextOptions): Promise<ScenarioCo
         throw error;
       });
     },
+    retryPaced<T>(request: () => Promise<T>) {
+      return withRetry(async () => { await pace(); return request(); }, { attempts: 4, sleep });
+    },
     track(orderId: string) {
       tracked.push(orderId);
     },
