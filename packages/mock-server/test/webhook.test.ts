@@ -192,12 +192,30 @@ describe('order events', () => {
     expect(new Set(events().map((ev) => ev.id)).size).toBe(events().length);
   });
 
-  it('sends order events only to the key that owns the order, and none to a menu-only endpoint', async () => {
+  it('sends an order event only to the endpoint of the key that owns the order', async () => {
+    await register(['order']);
+    const theirs = await placeOrder(SECOND_FULL_KEY);
+    await mock.accept(theirs.id);
+    await settle();
+    expect(capture.requests).toHaveLength(0);
+
+    const other = await put({ url: `${capture.url}/webhooks/second`, events: ['order'] }, SECOND_FULL_KEY);
+    expect(other.status).toBe(200);
+    const mine = await placeOrder();
+    await mock.accept(mine.id);
+    const theirsAgain = await placeOrder(SECOND_FULL_KEY);
+    await mock.accept(theirsAgain.id);
+    await settle();
+    const byPath = (path: string) => capture.requests.filter((r) => r.path === path).map((r) => parseWebhookEnvelope(r.body)!.data.orderId);
+    expect(capture.requests).toHaveLength(2);
+    expect(byPath('/webhooks/foodops')).toEqual([mine.id]);
+    expect(byPath('/webhooks/second')).toEqual([theirsAgain.id]);
+  });
+
+  it('sends no order event to a menu-only endpoint', async () => {
     await register(['menu']);
     const mine = await placeOrder();
     await mock.accept(mine.id);
-    const theirs = await placeOrder(SECOND_FULL_KEY);
-    await mock.accept(theirs.id);
     await settle();
     expect(capture.requests).toHaveLength(0);
   });
