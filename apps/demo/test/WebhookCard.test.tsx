@@ -70,7 +70,9 @@ describe('the Webhooks card on the setup page', () => {
     renderCard(fakeClient({ setWebhook }));
     await card().findByText('No webhook is registered for this key.');
     await user.click(card().getByRole('button', { name: 'Register webhook' }));
-    expect(await card().findByRole('alert')).toHaveTextContent('No receiver is answering at http://127.0.0.1:4021. Start it with "npm run receiver" and try again. Nothing was changed.');
+    expect(await card().findByRole('alert')).toHaveTextContent(
+      `No receiver is answering this page at http://127.0.0.1:4021. Start it with "npm run receiver". If it is running, it does not allow this page's address (${window.location.origin}): `
+      + 'it answers 403 origin_not_allowed, which a browser reports as no answer. Add the address to WEBHOOK_ALLOWED_ORIGINS in .env and restart the receiver. Nothing was changed.');
     expect(setWebhook).not.toHaveBeenCalled();
   });
 
@@ -177,6 +179,57 @@ describe('the Webhooks card on the setup page', () => {
     await waitFor(() => expect(status()).toHaveTextContent('Registered. https://another-team.example.com/hook'));
     expect(status()).toHaveTextContent('This webhook points somewhere other than the URL above');
     expect(receiver.calls).toEqual([]);
+  });
+
+  it('asks twice, naming the other host, before replacing a webhook that points somewhere else', async () => {
+    const user = userEvent.setup();
+    const setWebhook = vi.fn(async () => ({ ...hook(), secret: SECRET }));
+    renderCard(fakeClient({ getWebhook: vi.fn(async () => hook({ url: 'https://another-team.example.com/hook' })), setWebhook }));
+    await waitFor(() => expect(status()).toHaveTextContent('Registered. https://another-team.example.com/hook'));
+    await user.click(card().getByRole('button', { name: 'Register again (new secret)' }));
+    expect(card().getByRole('alert')).toHaveTextContent(/replaces the webhook at another-team\.example\.com.*stops getting events.*secret stops working/);
+    expect(setWebhook).not.toHaveBeenCalled();
+    expect(receiver.calls).toEqual([]);
+    // Anything other than the second press backs out.
+    await user.click(card().getByLabelText(/webhook url/i));
+    expect(card().queryByRole('alert')).toBeNull();
+    expect(card().getByRole('button', { name: 'Register again (new secret)' })).toBeInTheDocument();
+    expect(setWebhook).not.toHaveBeenCalled();
+    await user.click(card().getByRole('button', { name: 'Register again (new secret)' }));
+    await user.click(card().getByRole('button', { name: 'Yes, replace the webhook at another-team.example.com' }));
+    await waitFor(() => expect(status()).toHaveTextContent(`Registered. ${LOCAL_URL}`));
+    expect(setWebhook).toHaveBeenCalledTimes(1);
+    expect(receiver.secret).toBe(SECRET);
+  });
+
+  it('asks twice, naming the other host, before removing a webhook that points somewhere else', async () => {
+    const user = userEvent.setup();
+    const deleteWebhook = vi.fn(async () => undefined);
+    renderCard(fakeClient({ getWebhook: vi.fn(async () => hook({ url: 'https://another-team.example.com/hook' })), deleteWebhook }));
+    await waitFor(() => expect(status()).toHaveTextContent('Registered. https://another-team.example.com/hook'));
+    await user.click(card().getByRole('button', { name: 'Remove webhook' }));
+    expect(card().getByRole('alert')).toHaveTextContent(/removes the webhook at another-team\.example\.com.*stops getting events/);
+    expect(deleteWebhook).not.toHaveBeenCalled();
+    // Pressing the other button does not confirm this one: it arms that one instead.
+    await user.click(card().getByRole('button', { name: 'Register again (new secret)' }));
+    expect(deleteWebhook).not.toHaveBeenCalled();
+    await user.click(card().getByRole('button', { name: 'Remove webhook' }));
+    await user.click(card().getByRole('button', { name: 'Yes, remove the webhook at another-team.example.com' }));
+    expect(await card().findByText('No webhook is registered for this key.')).toBeInTheDocument();
+    expect(deleteWebhook).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops re-reading the webhook once the key is refused, instead of asking every 15 s', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const getWebhook = vi.fn().mockRejectedValue(new PartnerApiError({ status: 403, code: 'insufficient_scope', message: 'Missing partner.webhook' }));
+      renderCard(fakeClient({ getWebhook }));
+      expect(await card().findByRole('alert')).toHaveTextContent('Setup problem: insufficient_scope.');
+      await vi.advanceTimersByTimeAsync(46_000);
+      expect(getWebhook).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows a key without the webhook scope as a setup problem', async () => {

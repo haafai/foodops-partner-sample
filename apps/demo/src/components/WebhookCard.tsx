@@ -23,6 +23,14 @@ function lastDeliveryLine(hook: PartnerWebhook): string {
   return `Last event ${new Date(last.at).toLocaleString()}: ${outcome}${last.httpStatus === null ? '' : ` (HTTP ${last.httpStatus})`}.`;
 }
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
 /** Register, replace or remove this key's webhook, and show what the restaurant and the receiver each report. */
 export function WebhookCard({ client }: { client: PartnerClient }) {
   const { mode } = useSession();
@@ -35,6 +43,10 @@ export function WebhookCard({ client }: { client: PartnerClient }) {
   const [problem, setProblem] = useState<unknown>(null);
   const registered = hook.data ?? null;
   const pointsHere = registered !== null && registered.url === saved.publicUrl;
+  // The endpoint is one per restaurant and partner, so one registered elsewhere may be somebody's live receiver.
+  // Replacing or removing it takes two presses of the same button; anything else in between backs out.
+  const foreignHost = registered !== null && !pointsHere ? hostOf(registered.url) : null;
+  const [armed, setArmed] = useState<'register' | 'remove' | null>(null);
 
   // Asked only once something is registered: a page with no webhook makes no call to the receiver at all.
   const receiver = useQuery({
@@ -46,6 +58,11 @@ export function WebhookCard({ client }: { client: PartnerClient }) {
   });
 
   async function register() {
+    if (foreignHost !== null && armed !== 'register') {
+      setArmed('register');
+      return;
+    }
+    setArmed(null);
     const next = normaliseWebhookSettings({ receiverUrl, publicUrl });
     const message = validateWebhookSettings(next, mode);
     if (message) {
@@ -58,7 +75,11 @@ export function WebhookCard({ client }: { client: PartnerClient }) {
       // Checked BEFORE the PUT: a PUT replaces the secret at once, so one that the receiver never gets
       // would leave every delivery refused.
       if (!(await ReceiverControl.detect(next.receiverUrl))) {
-        setProblem(new Error(`No receiver is answering at ${next.receiverUrl}. Start it with "npm run receiver" and try again. Nothing was changed.`));
+        // The receiver answers a page it does not know with 403 origin_not_allowed and no CORS header, and a browser
+        // hides such an answer from the page: a wrong port for this app looks exactly like no receiver at all.
+        setProblem(new Error(`No receiver is answering this page at ${next.receiverUrl}. Start it with "npm run receiver". `
+          + `If it is running, it does not allow this page's address (${window.location.origin}): it answers 403 origin_not_allowed, which a browser reports as no answer. `
+          + 'Add the address to WEBHOOK_ALLOWED_ORIGINS in .env and restart the receiver. Nothing was changed.'));
         return;
       }
       const { secret, ...endpoint } = await client.setWebhook(next.publicUrl);
@@ -80,6 +101,11 @@ export function WebhookCard({ client }: { client: PartnerClient }) {
   }
 
   async function remove() {
+    if (foreignHost !== null && armed !== 'remove') {
+      setArmed('remove');
+      return;
+    }
+    setArmed(null);
     setBusy(true);
     setProblem(null);
     try {
@@ -110,11 +136,20 @@ export function WebhookCard({ client }: { client: PartnerClient }) {
         <input className="field" value={receiverUrl} onChange={(e) => setReceiverUrl(e.target.value)} placeholder="http://127.0.0.1:4021" />
       </label>
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn-primary" disabled={busy} onClick={() => void register()}>
-          {registered ? 'Register again (new secret)' : 'Register webhook'}
+        <button type="button" className="btn-primary" disabled={busy} onClick={() => void register()} onBlur={() => setArmed((a) => (a === 'register' ? null : a))}>
+          {armed === 'register' && foreignHost !== null ? `Yes, replace the webhook at ${foreignHost}` : registered ? 'Register again (new secret)' : 'Register webhook'}
         </button>
-        <button type="button" className="btn-ghost" disabled={busy || !registered} onClick={() => void remove()}>Remove webhook</button>
+        <button type="button" className="btn-ghost" disabled={busy || !registered} onClick={() => void remove()} onBlur={() => setArmed((a) => (a === 'remove' ? null : a))}>
+          {armed === 'remove' && foreignHost !== null ? `Yes, remove the webhook at ${foreignHost}` : 'Remove webhook'}
+        </button>
       </div>
+      {armed !== null && foreignHost !== null && (
+        <p role="alert" className="text-sm font-semibold text-chili">
+          {armed === 'register'
+            ? `This replaces the webhook at ${foreignHost}. That receiver stops getting events and its secret stops working at once. Press the button again to go ahead.`
+            : `This removes the webhook at ${foreignHost}. That receiver stops getting events at once. Press the button again to go ahead.`}
+        </p>
+      )}
       <div className="dev-card space-y-1" data-testid="webhook-status">
         {hook.isPending && <p>Checking…</p>}
         {hook.isSuccess && !registered && <p>No webhook is registered for this key.</p>}
@@ -124,7 +159,12 @@ export function WebhookCard({ client }: { client: PartnerClient }) {
             <p>Events: {registered.events.join(', ')}</p>
             <p>{lastDeliveryLine(registered)}</p>
             {registered.consecutiveFailures > 0 && <p className="font-semibold text-chili">{registered.consecutiveFailures} failed in a row. Nothing is re-sent; the next change sends the next event.</p>}
-            {!pointsHere && <p className="font-semibold text-chili">This webhook points somewhere other than the URL above, so this app is not receiving its events. Register to take it over.</p>}
+            {foreignHost !== null && (
+              <p className="font-semibold text-chili">
+                This webhook points somewhere other than the URL above ({foreignHost}), so this app is not receiving its events. There is one webhook per restaurant:
+                registering here or removing it cuts that receiver off. Leave it alone unless it is yours to replace.
+              </p>
+            )}
           </>
         )}
         {pointsHere && receiver.isSuccess && (
