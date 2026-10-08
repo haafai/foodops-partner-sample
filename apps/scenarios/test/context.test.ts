@@ -52,7 +52,9 @@ describe('createContext', () => {
 
   it('detects the mock and fills every capability from it', async () => {
     const ctx = await createContext({ baseUrl: handle.url, apiKey: FULL_KEY });
-    expect([...ctx.capabilities].sort()).toEqual(['closed-outlet', 'menu-only-key', 'mock-control', 'unbound-key']);
+    expect([...ctx.capabilities].sort()).toEqual(['closed-outlet', 'menu-only-key', 'mock-control', 'unbound-key', 'webhook-listener', 'webhook-url']);
+    expect(ctx.webhookUrl).toBeUndefined();
+    expect(ctx.webhookListenPort).toBe(0);
     expect(ctx.closedOutletId).toBe(OUTLET_LAGOON_KIOSK);
     expect(ctx.menuOnlyKey).toBe(MENU_ONLY_KEY);
     expect(ctx.unboundKey).toBe(UNBOUND_KEY);
@@ -64,6 +66,14 @@ describe('createContext', () => {
     expect(bare.capabilities.size).toBe(0);
     const flagged = await createContext({ baseUrl: 'http://127.0.0.1:1', apiKey: FULL_KEY, closedOutletId: 'x', menuOnlyKey: 'k' });
     expect([...flagged.capabilities].sort()).toEqual(['closed-outlet', 'menu-only-key']);
+    const urlOnly = await createContext({ baseUrl: 'http://127.0.0.1:1', apiKey: FULL_KEY, webhookUrl: 'https://hooks.partner.example/webhooks/foodops' });
+    expect([...urlOnly.capabilities]).toEqual(['webhook-url']);
+    const tunnelled = await createContext({ baseUrl: 'http://127.0.0.1:1', apiKey: FULL_KEY, webhookUrl: 'https://hooks.partner.example/webhooks/foodops', webhookListenPort: 4020 });
+    expect([...tunnelled.capabilities].sort()).toEqual(['webhook-listener', 'webhook-url']);
+    expect(tunnelled.webhookListenPort).toBe(4020);
+    // A port with no public URL in front of it is useless against a real API.
+    const portOnly = await createContext({ baseUrl: 'http://127.0.0.1:1', apiKey: FULL_KEY, webhookListenPort: 4020 });
+    expect(portOnly.capabilities.size).toBe(0);
   });
 
   it('reference() is unique per call and cleanup() cancels tracked orders', async () => {

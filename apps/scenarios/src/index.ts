@@ -7,8 +7,9 @@ import { orderInvalidLineModifierOverMax, orderInvalidLineUnavailableVariant, or
 import { orderRejectedReason, orderRetryThroughFaults, orderTimeout } from './scenarios/orders-restaurant';
 import { orderForeignIds, orderOutletClosed } from './scenarios/orders-visibility';
 import { outletsList } from './scenarios/outlets';
+import { webhookInvalidUrl, webhookMenuEvent, webhookOrderEvent, webhookRegister } from './scenarios/webhooks';
 
-/** In the order they run: reads first, then writes, then the restaurant, then auth. */
+/** In the order they run: reads first, then writes, then the restaurant, then auth, then webhooks. */
 export const ALL_SCENARIOS: Scenario[] = [
   outletsList,
   menuEtag,
@@ -31,6 +32,10 @@ export const ALL_SCENARIOS: Scenario[] = [
   authWrongKey,
   authMenuOnlyKey,
   authUnboundKey,
+  webhookRegister,
+  webhookInvalidUrl,
+  webhookOrderEvent,
+  webhookMenuEvent,
 ];
 
 export * from './scenario';

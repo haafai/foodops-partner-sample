@@ -2,7 +2,7 @@ import type { CreatePartnerOrderLine, PartnerClient, PartnerMenu, PartnerMenuVar
 import type { MockControl } from '@foodops-partner/mock-server/control-client';
 
 /** What a scenario needs that a real API may not offer. Missing ⇒ the scenario is skipped, never failed. */
-export type Capability = 'mock-control' | 'closed-outlet' | 'menu-only-key' | 'unbound-key';
+export type Capability = 'mock-control' | 'closed-outlet' | 'menu-only-key' | 'unbound-key' | 'webhook-url' | 'webhook-listener';
 
 export interface RawInit {
   body?: unknown;
@@ -21,6 +21,10 @@ export interface ScenarioContext {
   closedOutletId?: string;
   menuOnlyKey?: string;
   unboundKey?: string;
+  /** A webhook URL the target will accept. Unset against the mock, where a scenario registers its own listener. */
+  webhookUrl?: string;
+  /** The local port a webhook scenario listens on; deliveries to `webhookUrl` must reach it. 0 means any free port. */
+  webhookListenPort?: number;
   /** A bare request under the partner prefix, for cases the client refuses to send (a missing Idempotency-Key). */
   raw(method: string, path: string, init?: RawInit): Promise<Response>;
   /** A partner reference unique to this run. */
