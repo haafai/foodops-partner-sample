@@ -10,6 +10,7 @@ import { useSession } from '../config/SessionProvider';
 import { listTracked, updateTracked } from '../orders/orderStore';
 import { pollIntervalMs } from '../orders/polling';
 import { useOrder } from '../orders/useOrder';
+import { useWebhookFeed } from '../webhooks/webhookFeed';
 
 const money = (n: number) => n.toFixed(2);
 
@@ -18,6 +19,7 @@ export function OrderPage() {
   const { client, mode } = useSession();
   const queryClient = useQueryClient();
   const query = useOrder(orderId);
+  const { active: webhookActive } = useWebhookFeed();
   const tracked = listTracked().find((o) => o.id === orderId);
   const [reason, setReason] = useState('Customer cancelled');
   // One key per page visit: a cancel retried after a network failure replays instead of conflicting.
@@ -33,7 +35,7 @@ export function OrderPage() {
   if (query.isPending) return <p className="p-4 text-muted">Loading order…</p>;
   if (!query.data) return <div className="p-4"><ErrorNotice error={query.error} /></div>;
   const order = query.data;
-  const interval = pollIntervalMs({ status: order.status, createdAt: order.createdAt, now: Date.now() });
+  const interval = pollIntervalMs({ status: order.status, createdAt: order.createdAt, now: Date.now(), webhookActive });
 
   async function cancel() {
     if (!client) return;
@@ -56,7 +58,11 @@ export function OrderPage() {
       <StatusTimeline order={order} />
       <p className="flex flex-wrap items-center gap-2 text-xs text-muted">
         <span className="chip">status <strong data-testid="order-status">{order.status}</strong></span>
-        <span>{interval === false ? 'Final status; polling stopped.' : `Checking every ${interval / 1000} s.`}</span>
+        <span>
+          {interval === false ? 'Final status; polling stopped.'
+            : webhookActive ? `Live by webhook; checking every ${interval / 1000} s as a backstop.`
+              : `Checking every ${interval / 1000} s.`}
+        </span>
       </p>
       {query.isError && <ErrorNotice error={query.error} />}
       <section className="card p-4">

@@ -8,10 +8,13 @@ import { StatusPill } from '../components/StatusPill';
 import { errorLine } from '../errors/errorText';
 import { useSession } from '../config/SessionProvider';
 import { listTracked, updateTracked } from '../orders/orderStore';
-import { BOARD_POLL_MS } from '../orders/polling';
+import { boardPollMs } from '../orders/polling';
+import { useWebhookFeed } from '../webhooks/webhookFeed';
 
 export function OrdersPage() {
   const { client } = useSession();
+  const { active: webhookActive } = useWebhookFeed();
+  const pollMs = boardPollMs(webhookActive);
   const tracked = listTracked();
   const [, bump] = useState(0);
   const queries = useQueries({
@@ -20,7 +23,7 @@ export function OrdersPage() {
       queryFn: () => client!.getOrder(order.id),
       enabled: client !== null && !isTerminal(order.lastStatus),
       // A row that errored (a 404 for another key's order, say) stops polling instead of failing every 15 s.
-      refetchInterval: (q: Query<PartnerOrder>) => (q.state.error ? false : BOARD_POLL_MS),
+      refetchInterval: (q: Query<PartnerOrder>) => (q.state.error ? false : pollMs),
       retry: false,
     })),
   });
@@ -82,7 +85,9 @@ export function OrdersPage() {
           );
         })}
       </ul>
-      <p className="text-xs text-muted">Orders placed from this browser. Open ones are re-checked every {BOARD_POLL_MS / 1000} s; finished ones are not.</p>
+      <p className="text-xs text-muted">
+        Orders placed from this browser. {webhookActive ? `Open ones update by webhook and are re-checked every ${pollMs / 1000} s as a backstop` : `Open ones are re-checked every ${pollMs / 1000} s`}; finished ones are not.
+      </p>
     </div>
   );
 }
