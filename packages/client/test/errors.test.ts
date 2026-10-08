@@ -8,7 +8,7 @@ describe('PartnerApiError', () => {
       'invalid_request', 'idempotency_key_required', 'invalid_api_key', 'quota_exceeded', 'partner_key_required',
       'endpoint_not_available', 'insufficient_scope', 'ip_not_allowed', 'not_found', 'duplicate_order', 'outlet_closed',
       'cannot_cancel', 'idempotency_conflict', 'outlet_not_accepting', 'outlet_not_configured', 'invalid_line',
-      'rate_limited', 'auth_unavailable', 'invalid_webhook_url', 'invalid_events',
+      'rate_limited', 'auth_unavailable', 'invalid_webhook_url', 'invalid_events', 'outlet_restricted_key',
     ]);
   });
 

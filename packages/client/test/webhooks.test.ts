@@ -101,6 +101,15 @@ describe('parseWebhookEnvelope', () => {
     expect(event?.type).toBe('invoice.paid');
     expect(event && (isOrderEvent(event) || isMenuEvent(event))).toBe(false);
   });
+  it('reads createdAt with seven fractional digits and with none, and orders the two correctly', () => {
+    const fractional = parseWebhookEnvelope('{"id":"evt_5","type":"order.ready","createdAt":"2026-10-08T09:12:44.1234567Z","data":{"orderId":"a","partnerReference":"p","outletId":"o","status":"ready"}}');
+    const whole = parseWebhookEnvelope('{"id":"evt_6","type":"order.preparing","createdAt":"2026-10-08T09:12:44Z","data":{"orderId":"a","partnerReference":"p","outletId":"o","status":"preparing"}}');
+    expect(fractional?.createdAt).toBe('2026-10-08T09:12:44.1234567Z');
+    expect(whole?.createdAt).toBe('2026-10-08T09:12:44Z');
+    expect(Date.parse(whole!.createdAt)).toBe(Date.UTC(2026, 9, 8, 9, 12, 44));
+    expect(Date.parse(fractional!.createdAt) - Date.parse(whole!.createdAt)).toBe(123);
+    expect(fractional && isOrderEvent(fractional)).toBe(true);
+  });
   it('is null for anything that is not an envelope', () => {
     for (const body of ['', 'not json', '[]', '{}', '{"id":"e","type":"order.ready","createdAt":"yesterday","data":{}}', '{"id":"e","type":"order.ready","createdAt":"2026-10-08T09:12:44Z"}', '{"id":"","type":"x","createdAt":"2026-10-08T09:12:44Z","data":{}}']) {
       expect(parseWebhookEnvelope(body), body).toBeNull();
