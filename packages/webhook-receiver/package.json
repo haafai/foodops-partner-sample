@@ -1,0 +1,11 @@
+{
+  "name": "@foodops-partner/webhook-receiver",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A webhook receiver for the FoodOps delivery partner API: verifies the signature, answers fast, ignores repeats. Reference code to copy.",
+  "exports": { ".": "./src/index.ts", "./control-client": "./src/control-client.ts" },
+  "types": "./src/index.ts",
+  "scripts": { "start": "tsx src/bin.ts", "typecheck": "tsc --noEmit -p tsconfig.json" },
+  "dependencies": { "@foodops-partner/client": "*" }
+}

@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "npm run dev -w @foodops-partner/demo",
     "mock": "npm run start -w @foodops-partner/mock-server",
+    "receiver": "npm run start -w @foodops-partner/webhook-receiver",
     "scenarios": "npm run start -w @foodops-partner/scenarios --",
     "ci:scenarios": "node scripts/ci-scenarios.mjs",
     "test": "vitest run",
