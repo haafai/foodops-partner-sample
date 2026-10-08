@@ -1,5 +1,8 @@
 import { MissingIdempotencyKeyError, PartnerTimeoutError, errorFromResponse } from './errors';
-import type { CreatePartnerOrderRequest, PartnerMenu, PartnerOrder, PartnerOrderCreated, PartnerOutlet } from './types';
+import type {
+  CreatePartnerOrderRequest, PartnerMenu, PartnerOrder, PartnerOrderCreated, PartnerOutlet, PartnerWebhook, PartnerWebhookEventName,
+  PartnerWebhookRegistration, SetPartnerWebhookRequest,
+} from './types';
 
 export const PARTNER_API_PREFIX = '/api/external/v1/partner';
 
@@ -31,7 +34,7 @@ function requireIdempotencyKey(key: string): void {
   }
 }
 
-/** The five partner calls. Every non-2xx answer throws a PartnerApiError. */
+/** The eight partner calls. Every non-2xx answer throws a PartnerApiError, except the 404 of `getWebhook`. */
 export class PartnerClient {
   readonly #baseUrl: string;
   readonly #apiKey: string;
@@ -78,6 +81,30 @@ export class PartnerClient {
     return this.#json<PartnerOrder>('POST', `orders/${encodeURIComponent(orderId)}/cancel`, {
       body: { reason }, headers: { 'Idempotency-Key': idempotencyKey },
     });
+  }
+
+  /**
+   * Set or replace the URL that receives events. Every call issues a NEW signing secret and the old one stops
+   * working at once, so this is also how you rotate it. The secret is in this answer and nowhere else.
+   * Leave `events` out to receive both families. No Idempotency-Key: the call replaces, it never adds.
+   */
+  setWebhook(url: string, events?: PartnerWebhookEventName[]): Promise<PartnerWebhookRegistration> {
+    const body: SetPartnerWebhookRequest = events ? { url, events } : { url };
+    return this.#json<PartnerWebhookRegistration>('PUT', 'webhook', { body });
+  }
+
+  /** The registered endpoint and its last delivery, never the secret. Null when none is set (the API answers 404). */
+  async getWebhook(): Promise<PartnerWebhook | null> {
+    const response = await this.#send('GET', 'webhook');
+    if (response.status === 404) return null;
+    if (!response.ok) throw await errorFromResponse(response);
+    return (await response.json()) as PartnerWebhook;
+  }
+
+  /** Remove the endpoint. Sending stops at once. Safe to call when none is set. */
+  async deleteWebhook(): Promise<void> {
+    const response = await this.#send('DELETE', 'webhook');
+    if (!response.ok) throw await errorFromResponse(response);
   }
 
   async #send(method: string, path: string, init: SendInit = {}): Promise<Response> {
