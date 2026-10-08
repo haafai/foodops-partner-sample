@@ -29,4 +29,6 @@ export interface ReceivedEventsPage {
   lastSeq: number;
   /** False after a restart, until a secret is handed over again: every delivery is being refused meanwhile. */
   hasSecret: boolean;
+  /** A new value every time the receiver starts. When it changes, `seq` began at 1 again: read from 0. */
+  bootId: string;
 }

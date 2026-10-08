@@ -13,7 +13,7 @@ import type { FakeReceiver } from './receiver-fake';
 import { fakeClient, renderWithProviders } from './render';
 
 const PUBLIC_URL = 'https://kaana-hooks.example.com/webhooks/foodops';
-const hook = (url = PUBLIC_URL): PartnerWebhook => ({ url, events: ['order', 'menu'], createdAt: '2026-10-08T09:00:00Z', updatedAt: '2026-10-08T09:00:00Z', lastDelivery: null, consecutiveFailures: 0 });
+const hook = (url = PUBLIC_URL, consecutiveFailures = 0): PartnerWebhook => ({ url, events: ['order', 'menu'], createdAt: '2026-10-08T09:00:00Z', updatedAt: '2026-10-08T09:00:00Z', lastDelivery: null, consecutiveFailures });
 const order = (status: PartnerOrderStatus): PartnerOrder => ({
   id: 'order-1', reference: 'SO-10001', partnerReference: 'DEMO-1', status, reason: null, cancelledBy: null,
   createdAt: '2026-10-08T09:00:00.000Z', updatedAt: '2026-10-08T09:00:00.000Z', totals: { subtotal: 95, tax: 7.04, serviceCharge: 0, total: 95 },
@@ -109,6 +109,45 @@ describe('WebhookFeedProvider', () => {
     expect(screen.getByTestId('active')).toHaveTextContent('false');
     receiver.secret = 'whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
     await waitFor(() => expect(screen.getByTestId('active')).toHaveTextContent('true'));
+  });
+
+  it('is not active while the restaurant reports failed deliveries, even though the receiver holds a secret', async () => {
+    // A dead tunnel, or a receiver holding an older secret: the receiver looks ready, and nothing is arriving.
+    let failures = 2;
+    const getWebhook = vi.fn(async () => hook(PUBLIC_URL, failures));
+    renderWithProviders(<WebhookFeedProvider pollMs={20} livenessMs={30}><Probe /></WebhookFeedProvider>, { client: fakeClient({ getWebhook, getOrder: vi.fn(async () => order('pending')) }) });
+    await waitFor(() => expect(receiver.calls.filter((c) => c.path === 'events').length).toBeGreaterThanOrEqual(2));
+    expect(screen.getByTestId('active')).toHaveTextContent('false');
+    // The provider keeps re-reading GET webhook on its own: a delivery got through, then they fail again.
+    failures = 0;
+    await waitFor(() => expect(screen.getByTestId('active')).toHaveTextContent('true'));
+    failures = 1;
+    await waitFor(() => expect(screen.getByTestId('active')).toHaveTextContent('false'));
+  });
+
+  it('does not re-read the webhook when none is registered, or when it is that of another receiver', async () => {
+    const none = vi.fn(async () => null);
+    const first = renderWithProviders(<WebhookFeedProvider pollMs={20} livenessMs={20}><Probe /></WebhookFeedProvider>, { client: fakeClient({ getWebhook: none, getOrder: vi.fn(async () => order('pending')) }) });
+    expect(await screen.findByText('pending')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(none).toHaveBeenCalledTimes(1);
+    first.unmount();
+    const other = vi.fn(async () => hook('https://another-team.example.com/hook'));
+    renderWithProviders(<WebhookFeedProvider pollMs={20} livenessMs={20}><Probe /></WebhookFeedProvider>, { client: fakeClient({ getWebhook: other, getOrder: vi.fn(async () => order('pending')) }) });
+    expect(await screen.findByText('pending')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(other).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a restarted receiver from the start, even when it has already counted past the old position', async () => {
+    renderWithProviders(<WebhookFeedProvider pollMs={20}><Probe /></WebhookFeedProvider>, { client: fakeClient({ getWebhook: vi.fn(async () => hook()), getOrder: vi.fn(async () => order('pending')) }) });
+    receiver.push(acceptedEvent);
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('accepted'));
+    // Restarted, and two events arrived before the next read: lastSeq (2) is not below the old position (1).
+    receiver.restart();
+    receiver.push({ id: 'evt_p', type: 'order.preparing', createdAt: '2026-10-08T09:01:00.000Z', data: { orderId: 'order-1', partnerReference: 'DEMO-1', outletId: 'o-marine', status: 'preparing' } });
+    receiver.push({ id: 'evt_q', type: 'invoice.paid', createdAt: '2026-10-08T09:01:01.000Z', data: {} });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('preparing'));
   });
 
   it('starts over when the receiver was restarted and counts from zero again', async () => {

@@ -14,7 +14,11 @@ export interface FakeReceiver {
   down: boolean;
   /** True: `PUT secret` answers 400. */
   refuseSecret: boolean;
+  /** Changes when the receiver is restarted, as the real one's does. */
+  bootId: string;
   push(event: WebhookEnvelope): void;
+  /** What a restart with the secret in its environment does: the events are gone and seq begins at 1 again. */
+  restart(): void;
 }
 
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -22,7 +26,11 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 /** Stands in for the receiver's control port. Any call to another address fails the test loudly. */
 export function fakeReceiver(base = 'http://127.0.0.1:4021'): FakeReceiver {
   const receiver: FakeReceiver = {
-    calls: [], afters: [], secret: null, events: [], rejected: 0, down: false, refuseSecret: false,
+    calls: [], afters: [], secret: null, events: [], rejected: 0, down: false, refuseSecret: false, bootId: 'boot-1',
+    restart() {
+      receiver.events.length = 0;
+      receiver.bootId = `boot-${Number(receiver.bootId.slice(5)) + 1}`;
+    },
     push(event) {
       receiver.events.push({ seq: receiver.events.length + 1, receivedAt: new Date().toISOString(), event });
     },
@@ -46,7 +54,7 @@ export function fakeReceiver(base = 'http://127.0.0.1:4021'): FakeReceiver {
       if (method === 'GET' && path === 'events') {
         const after = Number(searchParams.get('after') ?? '0');
         receiver.afters.push(after);
-        return json(200, { events: receiver.events.filter((e) => e.seq > after), lastSeq: receiver.events.length, hasSecret: receiver.secret !== null });
+        return json(200, { events: receiver.events.filter((e) => e.seq > after), lastSeq: receiver.events.length, hasSecret: receiver.secret !== null, bootId: receiver.bootId });
       }
       if (method === 'PUT' && path === 'secret') {
         if (receiver.refuseSecret) return json(400, { error: 'invalid_secret' });

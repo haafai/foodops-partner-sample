@@ -114,7 +114,7 @@ export function createControlHandler(state: ReceiverState, options: ControlOptio
       if (method === 'GET' && path === 'state') return reply(res, 200, state.snapshot(options.webhookUrl), cors);
       if (method === 'GET' && path === 'events') {
         const after = Number(url.searchParams.get('after') ?? '0');
-        const page: ReceivedEventsPage = { events: state.eventsAfter(Number.isFinite(after) ? after : 0), lastSeq: state.lastSeq, hasSecret: state.secret !== null };
+        const page: ReceivedEventsPage = { events: state.eventsAfter(Number.isFinite(after) ? after : 0), lastSeq: state.lastSeq, hasSecret: state.secret !== null, bootId: state.bootId };
         return reply(res, 200, page, cors);
       }
       if (method === 'PUT' && path === 'secret') {

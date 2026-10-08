@@ -12,6 +12,8 @@ export interface ReceiverStateOptions { secret?: string | null; clock?: () => nu
 export class ReceiverState {
   secret: string | null;
   readonly clock: () => number;
+  /** Names this run. `seq` starts at 1 on every start, so a reader needs this to notice a restart. */
+  readonly bootId: string = crypto.randomUUID();
   duplicates = 0;
   rejected = 0;
   lastReceivedAt: string | null = null;

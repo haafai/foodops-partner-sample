@@ -56,6 +56,18 @@ describe('the control client against a running receiver', () => {
     expect((await control.events(first.lastSeq)).events.map((e) => e.event.id)).toEqual(['evt_3']);
   });
 
+  it('names its run on every events page, so a reader can tell a restart from a quiet spell', async () => {
+    const first = await control.events();
+    expect(first.bootId).toMatch(/^[0-9a-f-]{36}$/);
+    expect((await control.events()).bootId).toBe(first.bootId);
+    const restarted = await startReceiver();
+    try {
+      expect((await new ReceiverControl(restarted.controlUrl).events()).bootId).not.toBe(first.bootId);
+    } finally {
+      await restarted.close();
+    }
+  });
+
   it('refuses a secret that is not one, and never echoes what it was sent', async () => {
     const error = await control.setSecret('whsec_tooshort').catch((e: unknown) => e as Error);
     expect(error).toBeInstanceOf(Error);
