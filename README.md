@@ -26,9 +26,26 @@ The contract this targets is pinned in [`CONTRACT.md`](CONTRACT.md). The walkthr
 
 ## Documentation
 
-Task-by-task guides are in [`docs/wiki`](docs/wiki/Home.md): running the demo, storing your key, syncing a menu,
-placing an order, setting up and exposing webhooks, pointing at a real restaurant, running the scenarios, using the
-mock, a go-live checklist, troubleshooting and an FAQ. Start at [`docs/wiki/Home.md`](docs/wiki/Home.md).
+Task-by-task guides, one job per page. Start at the [guides home](https://github.com/haafai/foodops-partner-sample/wiki/).
+
+| Guide | What it covers |
+|---|---|
+| [Run the demo locally](https://github.com/haafai/foodops-partner-sample/wiki/01-Run-the-demo-locally) | Install, start the mock and the demo, place a first order. |
+| [Get and store your key](https://github.com/haafai/foodops-partner-sample/wiki/02-Get-and-store-your-key) | What a restaurant gives you, what each scope allows, where the key goes. |
+| [Sync a menu](https://github.com/haafai/foodops-partner-sample/wiki/03-Sync-a-menu) | Outlets, the menu call, the version check, unavailable items, prices. |
+| [Place and track an order](https://github.com/haafai/foodops-partner-sample/wiki/04-Place-and-track-an-order) | Idempotency keys, statuses, cancelling, polling. |
+| [Set up webhooks](https://github.com/haafai/foodops-partner-sample/wiki/05-Set-up-webhooks) | Run the receiver, register your URL, store the secret, verify a signature. |
+| [Expose your receiver](https://github.com/haafai/foodops-partner-sample/wiki/06-Expose-your-receiver) | The public https URL the API needs, and the port that must stay private. |
+| [Point at a real restaurant](https://github.com/haafai/foodops-partner-sample/wiki/07-Point-at-a-real-restaurant) | Switching from the mock to a restaurant's API and key. |
+| [Run the scenarios](https://github.com/haafai/foodops-partner-sample/wiki/08-Run-the-scenarios) | Twenty-five checks to run before going live, and how to read them. |
+| [Use the mock server](https://github.com/haafai/foodops-partner-sample/wiki/09-Use-the-mock-server) | Built-in keys, simulating the restaurant, where the mock differs. |
+| [Go-live checklist](https://github.com/haafai/foodops-partner-sample/wiki/10-Go-live-checklist) | What to confirm before real orders flow. |
+| [Troubleshooting](https://github.com/haafai/foodops-partner-sample/wiki/Troubleshooting) | Start from the message or behaviour you see. |
+| [FAQ](https://github.com/haafai/foodops-partner-sample/wiki/FAQ) | Short answers with links to the guides. |
+
+The same pages are in this repository under [`docs/wiki`](docs/wiki/Home.md), which is the copy to edit; the wiki is
+published from it. For exact shapes and codes see [`CONTRACT.md`](CONTRACT.md); for the reasoning behind each step see
+the [integration guide](docs/integration-guide.md).
 
 ## Five-minute start
 
