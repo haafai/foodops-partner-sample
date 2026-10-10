@@ -24,6 +24,12 @@ every picture is a tile with the item's initials.
 The contract this targets is pinned in [`CONTRACT.md`](CONTRACT.md). The walkthrough is
 [`docs/integration-guide.md`](docs/integration-guide.md).
 
+## Documentation
+
+Task-by-task guides are in [`docs/wiki`](docs/wiki/Home.md): running the demo, storing your key, syncing a menu,
+placing an order, setting up and exposing webhooks, pointing at a real restaurant, running the scenarios, using the
+mock, a go-live checklist, troubleshooting and an FAQ. Start at [`docs/wiki/Home.md`](docs/wiki/Home.md).
+
 ## Five-minute start
 
 Needs Node 22.
@@ -96,7 +102,7 @@ your server makes the `PUT` and the secret never leaves it.
 ## Development
 
 ```bash
-npm test                # every unit test, all four parts
+npm test                # every unit test, all five parts
 npm run typecheck && npm run lint
 npm run ci:scenarios    # starts the mock and runs every scenario against it, as CI does
 ```
