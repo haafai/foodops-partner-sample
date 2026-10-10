@@ -6,5 +6,5 @@
   "description": "Named scenarios that exercise the FoodOps delivery partner API against any base URL.",
   "bin": { "partner-scenarios": "./bin/partner-scenarios.mjs" },
   "scripts": { "start": "tsx src/cli.ts", "typecheck": "tsc --noEmit -p tsconfig.json" },
-  "dependencies": { "@foodops-partner/client": "*", "@foodops-partner/mock-server": "*" }
+  "dependencies": { "@foodops-partner/client": "*", "@foodops-partner/mock-server": "*", "@foodops-partner/webhook-receiver": "*" }
 }

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { redactKey } from '@foodops-partner/client';
 import { useCart } from '../cart/CartProvider';
 import { NOTICE_BOX } from '../components/ErrorNotice';
+import { WebhookCard } from '../components/WebhookCard';
 import { Wordmark } from '../components/Wordmark';
 import { MODE_INFO } from '../config/modeInfo';
 import { useSession } from '../config/SessionProvider';
@@ -56,6 +57,8 @@ export function SetupPage() {
         {problem && <div role="alert" className={NOTICE_BOX}>{problem}</div>}
         <button type="submit" className="btn-primary w-full">Save and continue</button>
       </form>
+      {/* Only once a key is saved: before that there is no API to register with. */}
+      {client && <WebhookCard client={client} />}
     </div>
   );
 }

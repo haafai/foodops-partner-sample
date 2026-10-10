@@ -109,6 +109,59 @@ describe('PartnerClient', () => {
   });
 });
 
+describe('PartnerClient webhook calls', () => {
+  const hook = {
+    url: 'https://partner.example.test/hooks/foodops', events: ['order', 'menu'], createdAt: '2026-10-08T09:00:00Z', updatedAt: '2026-10-08T09:00:00Z',
+    lastDelivery: null, consecutiveFailures: 0,
+  };
+
+  it('setWebhook PUTs the URL alone when no events are given, with no Idempotency-Key, and returns the secret', async () => {
+    const f = fakeFetch(() => jsonResponse(200, { ...hook, secret: 'whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8' }));
+    const registered = await new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn }).setWebhook(hook.url);
+    expect(f.calls[0]?.url).toBe(`${BASE}${PARTNER_API_PREFIX}/webhook`);
+    expect(f.calls[0]?.init.method).toBe('PUT');
+    expect(JSON.parse(String(f.calls[0]?.init.body))).toEqual({ url: hook.url });
+    expect(f.header(0, 'idempotency-key')).toBeNull();
+    expect(f.header(0, 'authorization')).toBe(`Bearer ${KEY}`);
+    expect(registered.secret).toBe('whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8');
+  });
+
+  it('setWebhook sends the events it was given', async () => {
+    const f = fakeFetch(() => jsonResponse(200, { ...hook, events: ['order'], secret: 'whsec_x' }));
+    await new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn }).setWebhook(hook.url, ['order']);
+    expect(JSON.parse(String(f.calls[0]?.init.body))).toEqual({ url: hook.url, events: ['order'] });
+  });
+
+  it('setWebhook throws the API error for a refused URL', async () => {
+    const f = fakeFetch(() => jsonResponse(400, { error: 'invalid_webhook_url', message: 'The URL must be https on a public host.' }));
+    const error = await new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn }).setWebhook('http://10.0.0.1/hook').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PartnerApiError);
+    expect((error as PartnerApiError).code).toBe('invalid_webhook_url');
+  });
+
+  it('getWebhook returns the endpoint, and null for the 404 that means none is set', async () => {
+    const found = fakeFetch(() => jsonResponse(200, hook));
+    expect(await new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: found.fn }).getWebhook()).toEqual(hook);
+    expect(found.calls[0]?.init.method).toBe('GET');
+    const none = fakeFetch(() => jsonResponse(404, { error: 'not_found', message: 'No webhook is set.' }));
+    expect(await new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: none.fn }).getWebhook()).toBeNull();
+  });
+
+  it('getWebhook still throws for anything else, a missing scope included', async () => {
+    const f = fakeFetch(() => jsonResponse(403, { error: 'insufficient_scope', message: 'Missing partner.webhook' }));
+    const error = await new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn }).getWebhook().catch((e: unknown) => e);
+    expect((error as PartnerApiError).code).toBe('insufficient_scope');
+  });
+
+  it('deleteWebhook sends DELETE and resolves on the bodyless 204', async () => {
+    const f = fakeFetch(() => new Response(null, { status: 204 }));
+    await expect(new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn }).deleteWebhook()).resolves.toBeUndefined();
+    expect(f.calls[0]?.url).toBe(`${BASE}${PARTNER_API_PREFIX}/webhook`);
+    expect(f.calls[0]?.init.method).toBe('DELETE');
+    expect(f.calls[0]?.init.body).toBeUndefined();
+  });
+});
+
 /** A fetch that never answers until its signal aborts, then rejects the way fetch does. */
 function hangingFetch() {
   return fakeFetch((_url, init) => new Promise<Response>((_resolve, reject) => {

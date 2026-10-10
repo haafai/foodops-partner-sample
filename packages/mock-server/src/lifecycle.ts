@@ -5,6 +5,7 @@ import { error, json } from './http';
 import type { JsonResponse } from './http';
 import { findVisibleOrder, toOrderDto } from './orders';
 import type { MockState, StoredOrder } from './state';
+import { announceOrder } from './webhooks';
 
 export type TransitionResult = { ok: true; order: StoredOrder } | { ok: false; response: JsonResponse };
 
@@ -15,6 +16,8 @@ const invalid = (from: PartnerOrderStatus, to: string): TransitionResult =>
 /** Apply a change, stamp the time, and drop any autopilot timer once the order can no longer move. */
 function stamp(state: MockState, order: StoredOrder, patch: Partial<StoredOrder>): TransitionResult {
   Object.assign(order, patch, { updatedAt: state.clock() });
+  // Every status change in the mock passes through here, so this is the one place an order event is raised.
+  if (patch.status !== undefined) announceOrder(state, order);
   if (isTerminal(order.status)) {
     state.timers.get(order.id)?.();
     state.timers.delete(order.id);

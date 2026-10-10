@@ -1,4 +1,4 @@
-import type { PartnerOrderStatus, PartnerTotals } from '@foodops-partner/client';
+import type { PartnerOrderStatus, PartnerTotals, PartnerWebhookEventName, PartnerWebhookOutcome } from '@foodops-partner/client';
 import { OUTLETS } from './fixtures';
 import { error } from './http';
 import type { JsonResponse } from './http';
@@ -23,8 +23,26 @@ export interface StoredOrder {
   notes: string | null;
 }
 
+export interface StoredWebhook {
+  url: string;
+  /** `whsec_…`. Returned by PUT only; never in a GET, a snapshot or a log. */
+  secret: string;
+  events: PartnerWebhookEventName[];
+  createdAt: number;
+  updatedAt: number;
+  lastDelivery: { at: number; httpStatus: number | null; outcome: PartnerWebhookOutcome } | null;
+  consecutiveFailures: number;
+  /** The menu version last announced (or seen at registration) per outlet. */
+  menuVersions: Map<string, string>;
+}
+
 export interface OutletFlags { open: boolean; acceptingOnline: boolean }
-export interface MockStateOptions { clock?: () => number; scheduler?: Scheduler }
+export interface MockStateOptions {
+  clock?: () => number;
+  scheduler?: Scheduler;
+  /** How events leave the mock. Tests inject a double; the default is the global fetch. */
+  webhookFetch?: typeof fetch;
+}
 
 interface IdempotencyRecord { bodyKey: string; response: JsonResponse }
 
@@ -50,6 +68,11 @@ export class MockState {
   readonly priceOverrides = new Map<string, number>();
   /** Autopilot timer cancel functions by order id. */
   readonly timers = new Map<string, () => void>();
+  /** One endpoint per key id: in the mock every key is its own partner, as order visibility already is. */
+  readonly webhooks = new Map<string, StoredWebhook>();
+  /** Deliveries still in flight, so a test can wait for them. */
+  readonly deliveries = new Set<Promise<void>>();
+  readonly webhookFetch: typeof fetch;
   faults: FaultResponse[] = [];
   autopilot: AutopilotSettings = { enabled: false, stepSeconds: 5 };
   nextOrderNumber = 10001;
@@ -60,6 +83,7 @@ export class MockState {
   constructor(options: MockStateOptions = {}) {
     this.clock = options.clock ?? (() => Date.now());
     this.scheduler = options.scheduler ?? noScheduler;
+    this.webhookFetch = options.webhookFetch ?? ((input, init) => globalThis.fetch(input, init));
     this.reset();
   }
 
@@ -67,6 +91,7 @@ export class MockState {
     for (const cancel of this.timers.values()) cancel();
     this.timers.clear();
     this.orders.clear();
+    this.webhooks.clear();
     this.#idempotency.clear();
     this.priceOverrides.clear();
     this.faults = [];
@@ -74,6 +99,11 @@ export class MockState {
     this.nextOrderNumber = 10001;
     this.outlets.clear();
     for (const outlet of OUTLETS) this.outlets.set(outlet.outletId, { ...outlet.initial });
+  }
+
+  /** Resolves once every delivery that has started has finished, whatever its outcome. */
+  async settleDeliveries(): Promise<void> {
+    while (this.deliveries.size > 0) await Promise.allSettled([...this.deliveries]);
   }
 
   /** The stored answer for this key + Idempotency-Key, a 409 when the body differs, or undefined when unseen. */

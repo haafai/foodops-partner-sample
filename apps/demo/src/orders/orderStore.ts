@@ -9,6 +9,8 @@ export interface TrackedOrder {
   createdAt: string;
   idempotencyKey: string;
   lastStatus: PartnerOrderStatus;
+  /** `createdAt` of the last webhook event applied to this order; an older event is ignored. */
+  lastEventAt?: string;
   priceMismatch: boolean;
   partnerTotal: number | null;
   total: number;

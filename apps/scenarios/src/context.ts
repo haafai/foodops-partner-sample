@@ -10,6 +10,9 @@ export interface ContextOptions {
   closedOutletId?: string;
   menuOnlyKey?: string;
   unboundKey?: string;
+  /** A public https URL that forwards to `webhookListenPort` on this machine (a tunnel). Not needed against the mock. */
+  webhookUrl?: string;
+  webhookListenPort?: number;
   fetchImpl?: typeof fetch;
   /** Injected for tests: the pause between contract requests against a real API, and cleanup's retry back-off. */
   sleep?: (ms: number) => Promise<void>;
@@ -78,11 +81,16 @@ export async function createContext(options: ContextOptions): Promise<ScenarioCo
     menuOnlyKey ??= MOCK_KEYS.find((k) => k.partnerBound && !k.scopes.includes('orders.write'))?.key;
     unboundKey ??= MOCK_KEYS.find((k) => !k.partnerBound)?.key;
   }
+  // The mock accepts a loopback URL, so against it a scenario can listen on any free port and register that.
+  const webhookUrl = options.webhookUrl;
+  const webhookListenPort = options.webhookListenPort ?? (mock ? 0 : undefined);
   const capabilities = new Set<Capability>();
   if (mock) capabilities.add('mock-control');
   if (closedOutletId) capabilities.add('closed-outlet');
   if (menuOnlyKey) capabilities.add('menu-only-key');
   if (unboundKey) capabilities.add('unbound-key');
+  if (mock || webhookUrl) capabilities.add('webhook-url');
+  if (webhookListenPort !== undefined && (mock || webhookUrl)) capabilities.add('webhook-listener');
 
   const tracked: string[] = [];
   let counter = 0;
@@ -91,7 +99,7 @@ export async function createContext(options: ContextOptions): Promise<ScenarioCo
   const menus = new Map<string, Promise<PartnerMenu>>();
 
   return {
-    client, baseUrl, apiKey: options.apiKey, fetchImpl, capabilities, mock, closedOutletId, menuOnlyKey, unboundKey,
+    client, baseUrl, apiKey: options.apiKey, fetchImpl, capabilities, mock, closedOutletId, menuOnlyKey, unboundKey, webhookUrl, webhookListenPort,
     async raw(method: string, path: string, init: RawInit = {}) {
       await pace();
       const headers: Record<string, string> = { accept: 'application/json', ...init.headers };
@@ -128,6 +136,9 @@ export async function createContext(options: ContextOptions): Promise<ScenarioCo
         menus.delete(outletId);
         throw error;
       });
+    },
+    retryPaced<T>(request: () => Promise<T>) {
+      return withRetry(async () => { await pace(); return request(); }, { attempts: 4, sleep });
     },
     track(orderId: string) {
       tracked.push(orderId);

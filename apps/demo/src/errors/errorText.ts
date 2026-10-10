@@ -12,6 +12,8 @@ export function errorLine(error: PartnerApiError): string {
     case 'cannot_cancel': return 'The kitchen has started this order. Call the restaurant.';
     case 'idempotency_conflict': return 'This retry key was already used with a different request. Retry with a new key.';
     case 'rate_limited': return `Slow down; retrying in ${error.retryAfterSeconds ?? 5} seconds.`;
+    case 'invalid_webhook_url': return 'The restaurant refused that webhook URL. It must be https on a public host, on port 443, with no user name in it.';
+    case 'invalid_events': return 'Choose order events, menu events, or both.';
     default: return SETUP_CODES.has(error.code) ? `Setup problem: ${error.code}. Check the key and contact the restaurant.` : error.message;
   }
 }

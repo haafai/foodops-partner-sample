@@ -78,3 +78,26 @@ export interface PartnerOrder {
   totals: PartnerTotals;
 }
 export interface CancelPartnerOrderRequest { reason: string }
+
+/** The two families of events a webhook can subscribe to. */
+export type PartnerWebhookEventName = 'order' | 'menu';
+export type PartnerWebhookOutcome = 'delivered' | 'http_error' | 'timeout' | 'connection_failed' | 'blocked_address';
+export interface PartnerWebhookLastDelivery {
+  at: string;
+  /** Null when no HTTP answer came back (a timeout, a refused connection, a blocked address). */
+  httpStatus: number | null;
+  outcome: PartnerWebhookOutcome;
+}
+export interface PartnerWebhook {
+  url: string;
+  /** Always in the order `order`, `menu`. */
+  events: PartnerWebhookEventName[];
+  createdAt: string;
+  updatedAt: string;
+  /** The last attempt, whatever its outcome; null until the first event is sent. */
+  lastDelivery: PartnerWebhookLastDelivery | null;
+  consecutiveFailures: number;
+}
+/** What `PUT webhook` answers. The secret is returned here and nowhere else: store it before doing anything more. */
+export interface PartnerWebhookRegistration extends PartnerWebhook { secret: string }
+export interface SetPartnerWebhookRequest { url: string; events?: PartnerWebhookEventName[] }

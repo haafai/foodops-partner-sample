@@ -8,11 +8,17 @@ import { runScenarios } from './runner';
 
 const USAGE = `partner-scenarios --base-url <url> --key <hbk_…> [--only a,b] [--json]
                   [--closed-outlet-id <id>] [--menu-only-key <hbk_…>] [--unbound-key <hbk_…>]
+                  [--webhook-url <https://…/webhooks/foodops>] [--webhook-listen-port <port>]
 
 Runs every scenario against the API at --base-url. Scenarios that need the mock's
 restaurant simulator, a closed outlet, or an extra key are skipped unless the target
 provides them. Base URL and key also come from PARTNER_API_BASE_URL / PARTNER_API_KEY
-(a .env file in the directory you ran npm from, or the current directory, is read).`;
+(a .env file in the directory you ran npm from, or the current directory, is read).
+
+The webhook scenarios set and remove this key's webhook, and skip when one is already
+registered. Against a real API they need --webhook-url, a public https URL that forwards
+to --webhook-listen-port on this machine (a tunnel), because the API refuses anything
+else. Also PARTNER_WEBHOOK_URL / PARTNER_WEBHOOK_LISTEN_PORT. The mock needs neither.`;
 
 // `npm run scenarios` runs this script inside apps/scenarios; INIT_CWD is where npm was invoked (the repo root).
 const envDir = process.env.INIT_CWD ?? process.cwd();
@@ -31,6 +37,8 @@ const { values } = parseArgs({
     'closed-outlet-id': { type: 'string' },
     'menu-only-key': { type: 'string' },
     'unbound-key': { type: 'string' },
+    'webhook-url': { type: 'string' },
+    'webhook-listen-port': { type: 'string' },
     help: { type: 'boolean', default: false },
   },
 });
@@ -47,9 +55,15 @@ if (!baseUrl || !apiKey) {
   process.exit(2);
 }
 
+const listenPort = values['webhook-listen-port'] ?? process.env.PARTNER_WEBHOOK_LISTEN_PORT;
+if (listenPort !== undefined && !/^\d{1,5}$/.test(listenPort)) {
+  console.error('--webhook-listen-port must be a port number.');
+  process.exit(2);
+}
 const ctx = await createContext({
   baseUrl, apiKey,
   closedOutletId: values['closed-outlet-id'], menuOnlyKey: values['menu-only-key'], unboundKey: values['unbound-key'],
+  webhookUrl: values['webhook-url'] ?? process.env.PARTNER_WEBHOOK_URL, webhookListenPort: listenPort === undefined ? undefined : Number(listenPort),
 });
 if (!values.json) {
   console.error(`Target ${ctx.baseUrl} · key ${redactKey(apiKey)} · capabilities: ${[...ctx.capabilities].join(', ') || 'none'}`);
