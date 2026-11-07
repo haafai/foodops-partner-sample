@@ -32,7 +32,7 @@ describe('OrderPage', () => {
     expect(screen.getByText(/checking every 5 s/i)).toBeInTheDocument();
     expect(screen.getByTestId('status-title')).toHaveTextContent('Being prepared');
     expect(screen.getByText('You can no longer cancel from here.')).toBeInTheDocument();
-    expect(steps().getAllByRole('listitem')).toHaveLength(5);
+    expect(steps().getAllByRole('listitem')).toHaveLength(7);
     expect(steps().getByText('Preparing').closest('li')).toHaveAttribute('aria-current', 'step');
     expect(steps().getByText('Ready').closest('li')).not.toHaveAttribute('aria-current');
   });
@@ -87,7 +87,61 @@ describe('OrderPage', () => {
     renderOrder(fakeClient({ getOrder: vi.fn(async () => order('on_hold' as PartnerOrderStatus)) }));
     expect(await screen.findByTestId('order-status')).toHaveTextContent('on_hold');
     expect(screen.getByTestId('status-title')).toHaveTextContent('on_hold');
-    expect(steps().getAllByRole('listitem')).toHaveLength(5);
+    expect(steps().getAllByRole('listitem')).toHaveLength(7);
+  });
+
+  const rider = () => within(screen.getByRole('region', { name: 'Your rider' }));
+
+  it('offers the rider buttons only once the restaurant has accepted', async () => {
+    renderOrder(fakeClient({ getOrder: vi.fn(async () => order('pending')) }));
+    await screen.findByTestId('order-status');
+    expect(rider().getByRole('button', { name: 'Out for delivery' })).toBeDisabled();
+    expect(rider().getByRole('button', { name: 'Delivered' })).toBeDisabled();
+    expect(rider().getByText(/once the restaurant accepts/i)).toBeInTheDocument();
+  });
+
+  it('reports out_for_delivery then delivered, each with its own idempotency key, and stops polling at delivered', async () => {
+    const user = userEvent.setup();
+    const updateOrderStatus = vi.fn()
+      .mockResolvedValueOnce(order('out_for_delivery'))
+      .mockResolvedValueOnce(order('delivered'));
+    renderOrder(fakeClient({ getOrder: vi.fn(async () => order('picked_up')), updateOrderStatus }));
+    await screen.findByTestId('order-status');
+    expect(screen.getByText(/checking every/i)).toBeInTheDocument();
+
+    await user.click(rider().getByRole('button', { name: 'Out for delivery' }));
+    expect(await screen.findByTestId('order-status')).toHaveTextContent('out_for_delivery');
+    expect(screen.getByTestId('status-title')).toHaveTextContent('On the way');
+    expect(rider().getByRole('button', { name: 'Out for delivery' })).toBeDisabled();
+
+    await user.click(rider().getByRole('button', { name: 'Delivered' }));
+    expect(await screen.findByText(/final status/i)).toBeInTheDocument();
+    expect(screen.getByTestId('order-status')).toHaveTextContent('delivered');
+    expect(steps().getByText('Delivered').closest('li')).toHaveAttribute('aria-current', 'step');
+    expect(rider().getByRole('button', { name: 'Delivered' })).toBeDisabled();
+
+    const keys = updateOrderStatus.mock.calls.map((c) => c[2]);
+    expect(updateOrderStatus.mock.calls.map((c) => [c[0], c[1]])).toEqual([['order-1', 'out_for_delivery'], ['order-1', 'delivered']]);
+    expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/);
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+
+  it('explains a 409 invalid_status_change and reloads the order', async () => {
+    const user = userEvent.setup();
+    const getOrder = vi.fn().mockResolvedValueOnce(order('ready')).mockResolvedValue(order('cancelled', { cancelledBy: 'restaurant', reason: 'Closed' }));
+    const updateOrderStatus = vi.fn().mockRejectedValue(new PartnerApiError({ status: 409, code: 'invalid_status_change', message: 'This order is cancelled, so it cannot be marked delivered.' }));
+    renderOrder(fakeClient({ getOrder, updateOrderStatus }));
+    await screen.findByTestId('order-status');
+    await user.click(rider().getByRole('button', { name: 'Delivered' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/cannot be marked delivered/i);
+    expect(await screen.findByTestId('order-status')).toHaveTextContent('cancelled');
+  });
+
+  it('puts a served order in the handover step', async () => {
+    renderOrder(fakeClient({ getOrder: vi.fn(async () => order('served')) }));
+    await screen.findByTestId('order-status');
+    expect(steps().getByText('Served').closest('li')).toHaveAttribute('aria-current', 'step');
+    expect(rider().getByRole('button', { name: 'Delivered' })).toBeEnabled();
   });
 
   it('shows the restaurant simulator in mock mode', async () => {

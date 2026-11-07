@@ -5,6 +5,7 @@ import { orderCancelAfterPreparing, orderCancelPending, orderCancelTwice } from 
 import { orderCreate, orderDuplicateReference, orderIdempotencyKeyRequired, orderIdempotentReplay, orderPriceMismatch } from './scenarios/orders-create';
 import { orderInvalidLineModifierOverMax, orderInvalidLineUnavailableVariant, orderInvalidLineUnknownVariant } from './scenarios/orders-lines';
 import { orderRejectedReason, orderRetryThroughFaults, orderTimeout } from './scenarios/orders-restaurant';
+import { orderReportDelivery, orderStatusNotAllowed } from './scenarios/orders-status';
 import { orderForeignIds, orderOutletClosed } from './scenarios/orders-visibility';
 import { outletsList } from './scenarios/outlets';
 import { webhookInvalidUrl, webhookMenuEvent, webhookOrderEvent, webhookRegister } from './scenarios/webhooks';
@@ -26,6 +27,8 @@ export const ALL_SCENARIOS: Scenario[] = [
   orderCancelPending,
   orderCancelTwice,
   orderCancelAfterPreparing,
+  orderReportDelivery,
+  orderStatusNotAllowed,
   orderRejectedReason,
   orderTimeout,
   orderRetryThroughFaults,

@@ -47,6 +47,17 @@ It is rejected automatically after the outlet's `acceptTimeoutMinutes`, with the
 While it is `pending` or `accepted`. From `preparing` on, the API answers `409 cannot_cancel`. See
 [Place and track an order](04-Place-and-track-an-order.md#cancelling).
 
+### How does the restaurant know my rider has delivered?
+
+You tell it: `POST orders/{orderId}/status` with `out_for_delivery` when the rider leaves and `delivered` when the
+customer has the order. Either is allowed once the restaurant has accepted the order. Until you report it, the order
+stays at `picked_up`. See [Place and track an order](04-Place-and-track-an-order.md#reporting-delivery).
+
+### When do I stop polling an order?
+
+At `delivered`, `rejected` or `cancelled`. `picked_up` is no longer final: it means the restaurant handed the order
+to your rider. If you never report delivery, stop once your own system knows the order is delivered.
+
 ### Is it safe to retry a create that timed out?
 
 Yes, if you send the same `Idempotency-Key` and the same body: the API replays the first answer. See
@@ -54,8 +65,8 @@ Yes, if you send the same `Idempotency-Key` and the same body: the API replays t
 
 ### Can I change an order after placing it?
 
-The API has no call for that. The calls are listed in [`CONTRACT.md`, Endpoints](../../CONTRACT.md#endpoints).
-Cancel while you still can and place a new order with a new `partnerReference`.
+The API has no call for changing its lines or customer; you can only cancel it or report your rider's progress. The
+calls are listed in [`CONTRACT.md`, Endpoints](../../CONTRACT.md#endpoints). Cancel while you still can and place a new order with a new `partnerReference`.
 
 ## Webhooks
 

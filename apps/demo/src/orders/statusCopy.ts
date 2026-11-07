@@ -4,13 +4,15 @@ export interface StatusCopy { title: string; subtitle: string }
 
 const LABELS: Record<string, string | undefined> = {
   pending: 'Waiting', accepted: 'Accepted', preparing: 'Preparing', ready: 'Ready',
-  picked_up: 'Picked up', rejected: 'Rejected', cancelled: 'Cancelled',
+  picked_up: 'Picked up', served: 'Served', out_for_delivery: 'On the way', delivered: 'Delivered',
+  rejected: 'Rejected', cancelled: 'Cancelled',
 };
 
 const TONES: Record<string, string | undefined> = {
   pending: 'bg-mustard text-navy',
   accepted: 'bg-leaf text-white', preparing: 'bg-leaf text-white', ready: 'bg-leaf text-white',
-  picked_up: 'bg-navy text-white',
+  picked_up: 'bg-leaf text-white', served: 'bg-leaf text-white', out_for_delivery: 'bg-leaf text-white',
+  delivered: 'bg-navy text-white',
   rejected: 'bg-chili text-white', cancelled: 'bg-chili text-white',
 };
 
@@ -31,7 +33,10 @@ export function statusCopy(order: Pick<PartnerOrder, 'status' | 'reason' | 'canc
     case 'accepted': return { title: `${capitalise(outlet)} accepted your order`, subtitle: 'The kitchen has it.' };
     case 'preparing': return { title: 'Being prepared', subtitle: 'You can no longer cancel from here.' };
     case 'ready': return { title: 'Ready for pickup', subtitle: 'Your rider can collect it now.' };
-    case 'picked_up': return { title: 'Picked up', subtitle: 'Enjoy your meal.' };
+    case 'picked_up': return { title: 'Picked up', subtitle: 'Your rider has collected it.' };
+    case 'served': return { title: 'Handed over', subtitle: `${capitalise(outlet)} marked it served.` };
+    case 'out_for_delivery': return { title: 'On the way', subtitle: 'Your rider is heading to you.' };
+    case 'delivered': return { title: 'Delivered', subtitle: 'Enjoy your meal.' };
     case 'rejected': return {
       title: `Rejected by ${outlet}`,
       subtitle: reason === 'timeout' ? 'The restaurant did not answer in time.' : reason || 'No reason was given.',

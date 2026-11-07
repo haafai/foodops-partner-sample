@@ -1,6 +1,6 @@
 # Contract pin
 
-Pinned to the Hubits partner API contract dated **2026-09-25**, with the webhook addition dated **2026-10-08**. The client types, the mock server and the
+Pinned to the Hubits partner API contract dated **2026-09-25**, with the webhook addition dated **2026-10-08** and the delivery-status addition dated **2026-11-07**. The client types, the mock server and the
 scenario runner in this repository implement exactly this. When the contract changes, one commit updates
 this file, `packages/client/src/types.ts`, the mock and the scenarios together.
 
@@ -21,6 +21,7 @@ Base path `/api/external/v1/partner`.
 | POST | `orders` | `orders.write` | 201 `PartnerOrderCreatedDto` + `Location`; `Idempotency-Key` required |
 | GET | `orders/{orderId}` | `orders.write` | 200 `PartnerOrderDto` |
 | POST | `orders/{orderId}/cancel` | `orders.write` | 200 `PartnerOrderDto`; `Idempotency-Key` required |
+| POST | `orders/{orderId}/status` | `orders.write` | 200 `PartnerOrderDto`; `Idempotency-Key` required |
 | PUT | `webhook` | `partner.webhook` | 200 `PartnerWebhookDto` with `secret`; sets or replaces; no `Idempotency-Key` |
 | GET | `webhook` | `partner.webhook` | 200 `PartnerWebhookDto` without `secret`; 404 when none is set |
 | DELETE | `webhook` | `partner.webhook` | 204, also when none is set |
@@ -41,20 +42,32 @@ PartnerOrderCreatedDto { id, reference, status, totals: PartnerTotalsDto, priceM
 PartnerOrderDto    { id, reference, partnerReference, status, reason|null, cancelledBy: "partner"|"restaurant"|null, createdAt, updatedAt, totals: PartnerTotalsDto }
 PartnerTotalsDto   { subtotal, tax, serviceCharge, total }
 CancelPartnerOrderRequest { reason }
+UpdatePartnerOrderStatusRequest { status: "out_for_delivery"|"delivered" }
 SetPartnerWebhookRequest { url, events?: ("order"|"menu")[] }
 PartnerWebhookDto  { url, events: ("order"|"menu")[], createdAt, updatedAt, lastDelivery: { at, httpStatus|null, outcome }|null, consecutiveFailures: int, secret? }
 WebhookEvent       { id: "evt_<26-character ULID>", type, createdAt, data }
 ```
 
-Request limits: `partnerReference` 1–64 characters; `lines` 1–100; `quantity` integer 1–999; `customer.name` ≤ 100; `customer.phone` ≤ 32; `notes` ≤ 500; `partnerTotal` ≥ 0; cancel `reason` 1–200.
+Request limits: `partnerReference` 1–64 characters; `lines` 1–100; `quantity` integer 1–999; `customer.name` ≤ 100; `customer.phone` ≤ 32; `notes` ≤ 500; `partnerTotal` ≥ 0; cancel `reason` 1–200; status `status` exactly `out_for_delivery` or `delivered`.
 
 ## Statuses
 
-`pending` → `accepted` → `preparing` → `ready` → `picked_up`, or `rejected` (from pending; `reason` is the
-restaurant's, `timeout` when it never answered), or `cancelled` (`cancelledBy` is `partner` or `restaurant`).
-Terminal: `picked_up`, `rejected`, `cancelled`. The partner may cancel while `pending` or `accepted`; a
-partner-initiated cancel's `reason` is returned prefixed `Partner: ` (sent `customer left`, read back
-`Partner: customer left`).
+`pending` → `accepted` → `preparing` → `ready` → `picked_up` → `out_for_delivery` → `delivered`, or `rejected`
+(from pending; `reason` is the restaurant's, `timeout` when it never answered), or `cancelled` (`cancelledBy` is
+`partner` or `restaurant`). `picked_up` is the restaurant handing the order over at the counter; `served` is the
+restaurant marking it served; `out_for_delivery` and `delivered` are the rider's steps, set by the restaurant or
+reported by the partner. The restaurant does not always mark every kitchen step, so an order can go from
+`accepted` straight to a later status.
+Terminal: `delivered`, `rejected`, `cancelled`. An order nobody reports delivered stays at `picked_up` (or
+`out_for_delivery`): report your rider's progress, and stop polling once your own system knows it is delivered.
+The partner may cancel while `pending` or `accepted`; a partner-initiated cancel's `reason` is returned prefixed
+`Partner: ` (sent `customer left`, read back `Partner: customer left`).
+
+`POST orders/{orderId}/status` reports the rider's progress. `out_for_delivery` is allowed from `accepted`,
+`preparing`, `ready`, `picked_up` and `served`; `delivered` from those and `out_for_delivery`. The status the order
+already has answers 200 and changes nothing (no event). `pending`, `rejected`, `cancelled`, and `delivered` back to
+`out_for_delivery` are `409 invalid_status_change`. Marking `delivered` an order the restaurant has already been
+paid for closes its bill at the restaurant.
 
 ## Errors
 
@@ -62,7 +75,7 @@ Body `{ "error": "<code>", "message": "<text>" }` on a real status code. Some co
 
 | Status | `error` | When |
 |---|---|---|
-| 400 | `invalid_request` | body fails validation (adds `field`) |
+| 400 | `invalid_request` | body fails validation (adds `field`; `status` for a status call naming anything but `out_for_delivery` or `delivered`) |
 | 400 | `idempotency_key_required` | write without `Idempotency-Key` |
 | 400 | `invalid_webhook_url` | the webhook `url` breaks a URL rule below |
 | 400 | `invalid_events` | `events` is empty or names something other than `order` and `menu` |
@@ -77,6 +90,8 @@ Body `{ "error": "<code>", "message": "<text>" }` on a real status code. Some co
 | 409 | `duplicate_order` | same `partnerReference` at this outlet within 24 h (adds `orderId`) |
 | 409 | `outlet_closed` | no till is open; nothing was queued |
 | 409 | `cannot_cancel` | order is preparing or later |
+| 409 | `invalid_status_change` | status call the order cannot take: `pending`, `rejected`, `cancelled`, or a step back; `message` names the current status |
+| 409 | `order_changed` | the restaurant kept changing the order while a cancel or status call was handled; retry with the same key |
 | 409 | `idempotency_conflict` | same key, different body |
 | 422 | `outlet_not_accepting` | the outlet paused online ordering |
 | 422 | `outlet_not_configured` | the outlet cannot take delivery orders yet |
@@ -112,7 +127,7 @@ and a whole-second form (`2026-10-08T09:12:44Z`).
 
 | `type` | Sent when | `data` |
 |---|---|---|
-| `order.accepted`, `order.preparing`, `order.ready`, `order.picked_up` | the order reaches that status | `{ orderId, partnerReference, outletId, status }` |
+| `order.accepted`, `order.preparing`, `order.ready`, `order.picked_up`, `order.served`, `order.out_for_delivery`, `order.delivered` | the order reaches that status, including through your own `status` call | `{ orderId, partnerReference, outletId, status }` |
 | `order.rejected` | the restaurant rejects, or the accept timeout fires | the above plus `reason` |
 | `order.cancelled` | the restaurant or the partner cancels | the above plus `reason`, `cancelledBy` |
 | `menu.updated` | an outlet's menu `version` changes for this partner | `{ outletId, version }` |

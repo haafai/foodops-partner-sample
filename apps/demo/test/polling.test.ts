@@ -11,9 +11,14 @@ describe('pollIntervalMs', () => {
     expect(pollIntervalMs({ status: 'preparing', createdAt, now: at(121) })).toBe(15_000);
   });
   it('stops at a terminal status', () => {
-    expect(pollIntervalMs({ status: 'picked_up', createdAt, now: at(10) })).toBe(false);
+    expect(pollIntervalMs({ status: 'delivered', createdAt, now: at(10) })).toBe(false);
     expect(pollIntervalMs({ status: 'rejected', createdAt, now: at(10) })).toBe(false);
     expect(pollIntervalMs({ status: 'cancelled', createdAt, now: at(10) })).toBe(false);
+  });
+  it('keeps polling a picked-up or served order: the rider steps are still to come', () => {
+    expect(pollIntervalMs({ status: 'picked_up', createdAt, now: at(500) })).toBe(15_000);
+    expect(pollIntervalMs({ status: 'served', createdAt, now: at(500) })).toBe(15_000);
+    expect(pollIntervalMs({ status: 'out_for_delivery', createdAt, now: at(500) })).toBe(15_000);
   });
   it('waits Retry-After when the server asked for it', () => {
     expect(pollIntervalMs({ status: 'pending', createdAt, now: at(10), retryAfterSeconds: 30 })).toBe(30_000);
@@ -25,7 +30,7 @@ describe('pollIntervalMs', () => {
     expect(BACKSTOP_POLL_MS).toBe(60_000);
     expect(pollIntervalMs({ status: 'pending', createdAt, now: at(10), webhookActive: true })).toBe(60_000);
     expect(pollIntervalMs({ status: 'preparing', createdAt, now: at(500), webhookActive: true })).toBe(60_000);
-    expect(pollIntervalMs({ status: 'picked_up', createdAt, now: at(10), webhookActive: true })).toBe(false);
+    expect(pollIntervalMs({ status: 'delivered', createdAt, now: at(10), webhookActive: true })).toBe(false);
   });
   it('Retry-After still wins over the backstop', () => {
     expect(pollIntervalMs({ status: 'pending', createdAt, now: at(10), retryAfterSeconds: 90, webhookActive: true })).toBe(90_000);

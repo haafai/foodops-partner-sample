@@ -20,6 +20,7 @@ export function fakeClient(overrides: Partial<Record<keyof PartnerClient, unknow
     createOrder: vi.fn(),
     getOrder: vi.fn(),
     cancelOrder: vi.fn(),
+    updateOrderStatus: vi.fn(),
     // No webhook unless a test says otherwise, so no page reaches for a receiver.
     getWebhook: vi.fn(async () => null),
     setWebhook: vi.fn(),

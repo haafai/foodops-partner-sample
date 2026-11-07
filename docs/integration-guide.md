@@ -46,12 +46,17 @@ sent, which is the same rule the API applies.
 ```
                  ┌──────────┐  accept   ┌──────────┐ start  ┌───────────┐ done  ┌───────┐ collect ┌───────────┐
   POST orders ─► │ pending  │ ────────► │ accepted │ ─────► │ preparing │ ────► │ ready │ ──────► │ picked_up │
-                 └────┬─────┘           └────┬─────┘        └───────────┘       └───────┘         └───────────┘
-       reject / timeout │            partner or restaurant cancel │
-                        ▼                                         ▼
-                 ┌──────────┐                              ┌───────────┐
-                 │ rejected │                              │ cancelled │
-                 └──────────┘                              └───────────┘
+                 └────┬─────┘           └────┬─────┘        └───────────┘       └───────┘         └─────┬─────┘
+       reject / timeout │            partner or restaurant cancel │                        rider leaves │
+                        ▼                                         ▼                                     ▼
+                 ┌──────────┐                              ┌───────────┐                      ┌──────────────────┐
+                 │ rejected │                              │ cancelled │                      │ out_for_delivery │
+                 └──────────┘                              └───────────┘                      └─────────┬────────┘
+                                                                                          rider arrives │
+                                                                                                        ▼
+                                                                                                  ┌───────────┐
+                                                                                                  │ delivered │
+                                                                                                  └───────────┘
 ```
 
 - `POST orders` answers `201` with the restaurant's totals and the order `pending`. The restaurant accepts or
@@ -61,12 +66,22 @@ sent, which is the same rule the API applies.
   answers `200` with the order as it is.
 - When you cancel, the order's `reason` comes back prefixed `Partner: `: cancel with `customer left` and read
   `Partner: customer left`.
-- `picked_up`, `rejected` and `cancelled` are final. Stop polling.
+- `picked_up` means the restaurant handed the order over at the counter; `served` means the restaurant marked it
+  served. The restaurant does not always mark every kitchen step, so an order can go from `accepted` straight
+  to a later status.
+- **Report your rider's progress** with `POST orders/{id}/status` and `{ "status": "out_for_delivery" }`, then
+  `{ "status": "delivered" }` (`client.updateOrderStatus(orderId, status, key)`). Either is allowed once the
+  restaurant has accepted the order, with or without `out_for_delivery` first. Repeating the status the order
+  already has answers `200` and changes nothing. A `pending`, `rejected` or `cancelled` order, or `delivered`
+  back to `out_for_delivery`, answers `409 invalid_status_change`. `canReportStatus(current, target)` tells you
+  before you ask. Marking an order `delivered` that the restaurant has already been paid for closes its bill there.
+- `delivered`, `rejected` and `cancelled` are final. Stop polling. An order nobody reports stays at `picked_up`
+  (or `out_for_delivery`), so report delivery, and stop polling once your own system knows it is delivered.
 
 ## 4. Idempotency and retry
 
-Both writes require an `Idempotency-Key` header. This is how a retry after a timeout replays the original
-answer instead of placing a second order.
+Every order write (create, cancel, status) requires an `Idempotency-Key` header. This is how a retry after a
+timeout replays the original answer instead of placing a second order.
 
 1. Mint the key **before** the first attempt (`newIdempotencyKey()` is a UUID).
 2. Send the same key on every retry of that same request.
@@ -106,6 +121,8 @@ one when you click "Try again with the same key".
 | `outlet_not_configured` | The outlet cannot take delivery orders yet; tell the restaurant. |
 | `invalid_line` | `line` says which (0-based: `0` is the first line you sent); `reason` says why. Refresh the menu and rebuild the order. |
 | `cannot_cancel` | The kitchen has started. Call the restaurant. |
+| `invalid_status_change` | The order cannot take that status from where it is (`message` names it): not yet accepted, already over, or a step back. Read the order; do not retry. |
+| `order_changed` | The restaurant changed the order while yours was handled. Read it, and retry with the same idempotency key if the call still makes sense. |
 | `idempotency_conflict` | You reused a key with a different body. Mint a new key. |
 | `rate_limited` | Wait `Retry-After` seconds. The limit is 10 requests per second per key, burst 30. |
 | `auth_unavailable` | Temporary. Retry with the same idempotency key. |
@@ -116,7 +133,8 @@ You can learn about changes in two ways, and a good integration uses both.
 
 **Webhooks tell you quickly.** Register one URL per restaurant with `PUT webhook`
 (`client.setWebhook('https://hooks.example.com/webhooks/foodops')`). The restaurant's API then posts a small signed
-event there when one of your orders is accepted, started, ready, picked up, rejected or cancelled, and when an
+event there when one of your orders is accepted, started, ready, picked up, served, out for delivery, delivered,
+rejected or cancelled (including the steps you report yourself), and when an
 outlet's menu changes for you. Your key needs the `partner.webhook` scope. A key restricted to some outlets cannot
 register a webhook: `PUT` answers `403 outlet_restricted_key`. Each restaurant has its own secret, so when you
 serve many, give each restaurant its own URL (a path segment you mint) and look the secret up from it; the sample

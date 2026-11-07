@@ -8,7 +8,7 @@ connect to restaurants running FoodOps. It contains:
 | `packages/client` | A dependency-free TypeScript client: eight calls, one error type, a retry helper, and the webhook signature check. | Yes, this is the point. |
 | `packages/webhook-receiver` | A small server that takes the restaurant's events: verifies each signature, answers at once, ignores repeats. | Yes: the handler is the part to copy. |
 | `packages/mock-server` | A mock of the API that follows the contract rule for rule, with a simulated restaurant under `/_mock/`. | Run it; do not ship it. |
-| `apps/demo` | A small ordering app: outlets, menu with your prices, cart, checkout, live tracking, cancel. | Read it for the patterns. |
+| `apps/demo` | A small ordering app: outlets, menu with your prices, cart, checkout, live tracking, cancel, report out for delivery and delivered. | Read it for the patterns. |
 | `apps/scenarios` | Twenty-five named checks you can point at any base URL, including a real restaurant with a test key. | Run it before going live. |
 
 ## What the demo is, and is not
@@ -33,7 +33,7 @@ Task-by-task guides, one job per page. Start at the [guides home](https://github
 | [Run the demo locally](https://github.com/haafai/foodops-partner-sample/wiki/01-Run-the-demo-locally) | Install, start the mock and the demo, place a first order. |
 | [Get and store your key](https://github.com/haafai/foodops-partner-sample/wiki/02-Get-and-store-your-key) | What a restaurant gives you, what each scope allows, where the key goes. |
 | [Sync a menu](https://github.com/haafai/foodops-partner-sample/wiki/03-Sync-a-menu) | Outlets, the menu call, the version check, unavailable items, prices. |
-| [Place and track an order](https://github.com/haafai/foodops-partner-sample/wiki/04-Place-and-track-an-order) | Idempotency keys, statuses, cancelling, polling. |
+| [Place and track an order](https://github.com/haafai/foodops-partner-sample/wiki/04-Place-and-track-an-order) | Idempotency keys, statuses, cancelling, reporting delivery, polling. |
 | [Set up webhooks](https://github.com/haafai/foodops-partner-sample/wiki/05-Set-up-webhooks) | Run the receiver, register your URL, store the secret, verify a signature. |
 | [Expose your receiver](https://github.com/haafai/foodops-partner-sample/wiki/06-Expose-your-receiver) | The public https URL the API needs, and the port that must stay private. |
 | [Point at a real restaurant](https://github.com/haafai/foodops-partner-sample/wiki/07-Point-at-a-real-restaurant) | Switching from the mock to a restaurant's API and key. |

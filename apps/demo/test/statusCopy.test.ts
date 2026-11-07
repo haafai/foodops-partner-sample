@@ -3,7 +3,7 @@ import type { PartnerOrder, PartnerOrderStatus } from '@foodops-partner/client';
 import { statusCopy, statusLabel, statusTone } from '../src/orders/statusCopy';
 
 const order = (status: PartnerOrderStatus, reason: string | null = null, cancelledBy: PartnerOrder['cancelledBy'] = null) => ({ status, reason, cancelledBy });
-const ALL: PartnerOrderStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'rejected', 'cancelled'];
+const ALL: PartnerOrderStatus[] = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'served', 'out_for_delivery', 'delivered', 'rejected', 'cancelled'];
 
 describe('statusCopy', () => {
   it.each(ALL)('has a title, a label and a tone for %s', (status) => {
@@ -27,7 +27,14 @@ describe('statusCopy', () => {
   it('has fixed copy for the steps that need no name', () => {
     expect(statusCopy(order('preparing'), 'Marine Drive')).toEqual({ title: 'Being prepared', subtitle: 'You can no longer cancel from here.' });
     expect(statusCopy(order('ready'), 'Marine Drive')).toEqual({ title: 'Ready for pickup', subtitle: 'Your rider can collect it now.' });
-    expect(statusCopy(order('picked_up'), 'Marine Drive')).toEqual({ title: 'Picked up', subtitle: 'Enjoy your meal.' });
+    expect(statusCopy(order('picked_up'), 'Marine Drive')).toEqual({ title: 'Picked up', subtitle: 'Your rider has collected it.' });
+    expect(statusCopy(order('out_for_delivery'), 'Marine Drive')).toEqual({ title: 'On the way', subtitle: 'Your rider is heading to you.' });
+    expect(statusCopy(order('delivered'), 'Marine Drive')).toEqual({ title: 'Delivered', subtitle: 'Enjoy your meal.' });
+  });
+
+  it('says who handed over a served order', () => {
+    expect(statusCopy(order('served'), 'Marine Drive')).toEqual({ title: 'Handed over', subtitle: 'Marine Drive marked it served.' });
+    expect(statusCopy(order('served'), null).subtitle).toBe('The restaurant marked it served.');
   });
 
   it('explains a rejection by timeout, and one with no reason', () => {
@@ -51,7 +58,7 @@ describe('statusCopy', () => {
   });
 
   it('labels every status for a pill', () => {
-    expect(ALL.map(statusLabel)).toEqual(['Waiting', 'Accepted', 'Preparing', 'Ready', 'Picked up', 'Rejected', 'Cancelled']);
+    expect(ALL.map(statusLabel)).toEqual(['Waiting', 'Accepted', 'Preparing', 'Ready', 'Picked up', 'Served', 'On the way', 'Delivered', 'Rejected', 'Cancelled']);
   });
 
   it('drops the prefix the API puts before a partner cancellation reason, since the sentence already says who', () => {

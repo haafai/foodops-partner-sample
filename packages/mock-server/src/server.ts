@@ -5,7 +5,7 @@ import { handleControl } from './control';
 import type { MockKey, Scope } from './fixtures';
 import { empty, error, headerValue, readJson, send, text } from './http';
 import type { JsonResponse } from './http';
-import { handlePartnerCancel, scheduleAutopilot } from './lifecycle';
+import { handlePartnerCancel, handlePartnerStatus, scheduleAutopilot } from './lifecycle';
 import { handleGetMenu } from './menu';
 import { handleCreateOrder, handleGetOrder } from './orders';
 import { handleListOutlets } from './outlets';
@@ -33,7 +33,7 @@ interface Route {
   handle: (ctx: RouteContext, match: RegExpExecArray) => JsonResponse | Promise<JsonResponse>;
 }
 
-/** The two writes need the header before anything else, including reading the body. */
+/** The order writes need the header before anything else, including reading the body. */
 export function requireIdempotencyKey(req: IncomingMessage): string | JsonResponse {
   const key = headerValue(req.headers['idempotency-key'])?.trim();
   return key ? key : error(400, 'idempotency_key_required', 'Send an Idempotency-Key header with every write.');
@@ -58,6 +58,14 @@ export const routes: Route[] = [
       const idempotencyKey = requireIdempotencyKey(req);
       if (typeof idempotencyKey !== 'string') return idempotencyKey;
       return handlePartnerCancel(state, key, decodeURIComponent(m[1]), await body(), idempotencyKey);
+    },
+  },
+  {
+    method: 'POST', pattern: /^orders\/([^/]+)\/status$/, scope: 'orders.write',
+    handle: async ({ state, key, req, body }, m) => {
+      const idempotencyKey = requireIdempotencyKey(req);
+      if (typeof idempotencyKey !== 'string') return idempotencyKey;
+      return handlePartnerStatus(state, key, decodeURIComponent(m[1]), await body(), idempotencyKey);
     },
   },
   { method: 'PUT', pattern: /^webhook$/, scope: 'partner.webhook', handle: async ({ state, key, body }) => handlePutWebhook(state, key, await body()) },

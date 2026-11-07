@@ -84,6 +84,24 @@ per customer order.
 
 **Fix.** You cannot cancel through the API any more. Call the restaurant.
 
+### `409 invalid_status_change`
+
+**Cause.** A `POST orders/{orderId}/status` the order cannot take from where it is: it is `pending` (the restaurant
+has not accepted it), `rejected` or `cancelled`, or you sent `out_for_delivery` for an order already `delivered`.
+The `message` names the order's current status.
+
+**Fix.** Read the order (`GET orders/{orderId}`) and act on its status; retrying the same call fails the same way.
+`canReportStatus(current, target)` in the client tells you beforehand. See
+[Place and track an order](04-Place-and-track-an-order.md#reporting-delivery).
+
+### `409 order_changed`
+
+**Cause.** The restaurant changed the order while your cancel or status call was being handled, and the API did not
+apply yours.
+
+**Fix.** Read the order. If the call still makes sense, send it again with the same `Idempotency-Key`: only a
+successful answer is stored against a key.
+
 ### `409 idempotency_conflict`
 
 **Cause.** You reused an `Idempotency-Key` with a different request body.

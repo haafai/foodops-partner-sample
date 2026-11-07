@@ -37,7 +37,7 @@ times will differ on your machine.
 | [1. Run the demo locally](01-Run-the-demo-locally.md) | The mock and the ordering app running, and a first order placed. |
 | [2. Get and store your key](02-Get-and-store-your-key.md) | Your key in `.env`, and a clear idea of what it may do. |
 | [3. Sync a menu](03-Sync-a-menu.md) | Outlets and a menu fetched, and a cheap re-check with `If-None-Match`. |
-| [4. Place and track an order](04-Place-and-track-an-order.md) | An order created safely, followed to a final status, and cancelled. |
+| [4. Place and track an order](04-Place-and-track-an-order.md) | An order created safely, followed to a final status, cancelled, and reported delivered. |
 | [5. Set up webhooks](05-Set-up-webhooks.md) | Signed events arriving at the receiver, verified and de-duplicated. |
 | [6. Expose your receiver](06-Expose-your-receiver.md) | A public https address for the receiver, with the control port kept private. |
 | [7. Point at a real restaurant](07-Point-at-a-real-restaurant.md) | The same tools aimed at a test restaurant instead of the mock. |

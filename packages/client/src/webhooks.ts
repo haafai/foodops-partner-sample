@@ -10,7 +10,10 @@ export const WEBHOOK_SECRET_PREFIX = 'whsec_';
 /** Reject a signature whose timestamp is further than this from now, in either direction. */
 export const WEBHOOK_TOLERANCE_SECONDS = 300;
 
-export const ORDER_EVENT_TYPES = ['order.accepted', 'order.preparing', 'order.ready', 'order.picked_up', 'order.rejected', 'order.cancelled'] as const;
+export const ORDER_EVENT_TYPES = [
+  'order.accepted', 'order.preparing', 'order.ready', 'order.picked_up', 'order.served', 'order.out_for_delivery', 'order.delivered',
+  'order.rejected', 'order.cancelled',
+] as const;
 export type OrderEventType = (typeof ORDER_EVENT_TYPES)[number];
 export const MENU_EVENT_TYPE = 'menu.updated';
 

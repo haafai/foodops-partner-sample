@@ -1,6 +1,7 @@
 # Place and track an order
 
-At the end of this page you have created an order that is safe to retry, read its status, and cancelled it.
+At the end of this page you have created an order that is safe to retry, read its status, cancelled it, and
+reported a second order out for delivery and delivered.
 
 > These steps were checked against the mock in this repository. The real API follows
 > [`CONTRACT.md`](../../CONTRACT.md).
@@ -91,7 +92,8 @@ At the end of this page you have created an order that is safe to retry, read it
 
 ## Idempotency keys
 
-Both writes (`POST orders` and `POST orders/{orderId}/cancel`) require an `Idempotency-Key` header.
+Every order write (`POST orders`, `POST orders/{orderId}/cancel` and `POST orders/{orderId}/status`) requires an
+`Idempotency-Key` header.
 
 - Mint the key once per request, before the first attempt, and store it with the order you are about to place.
 - Send the same key on every retry of that same request.
@@ -107,9 +109,15 @@ Your `partnerReference` protects you a second time: the same reference at the sa
 
 ## Statuses
 
-An order starts `pending` and moves `accepted`, `preparing`, `ready`, `picked_up`. It can instead end `rejected`
-or `cancelled`. `picked_up`, `rejected` and `cancelled` are final: stop asking about the order once you read one of
-them. The full rules are in [`CONTRACT.md`, Statuses](../../CONTRACT.md#statuses).
+An order starts `pending` and moves `accepted`, `preparing`, `ready`, `picked_up`, then `out_for_delivery` and
+`delivered`. It can instead end `rejected` or `cancelled`. `picked_up` is the restaurant handing the order over at
+the counter; `served` is the restaurant marking it served; `out_for_delivery` and `delivered` are your rider's steps,
+which you report (below) and the restaurant can also set. The restaurant does not always mark every kitchen step, so
+an order can go from `accepted` straight to a later status.
+
+`delivered`, `rejected` and `cancelled` are final: stop asking about the order once you read one of them. An order
+nobody reports stays at `picked_up`, so report delivery, and stop polling once your own system knows the order is
+delivered. The full rules are in [`CONTRACT.md`, Statuses](../../CONTRACT.md#statuses).
 
 ## Cancelling
 
@@ -121,6 +129,47 @@ You may cancel while the order is `pending` or `accepted`. Once the kitchen has 
 
 That is a `409`. Cancelling an order that is already `cancelled` or `rejected` answers `200` with the order as it
 is, so a repeated cancel is harmless.
+
+## Reporting delivery
+
+Once the restaurant has accepted an order, tell it where your rider is: `out_for_delivery` when the rider leaves
+with the order, `delivered` when the customer has it. Each call is a write with its own new idempotency key, and
+answers the order as it now stands.
+
+1. Create and accept a second order (steps 2, 3 and 6 above, with `"partnerReference":"PX-1002"`), and keep its id
+   in `ORDER`.
+
+2. Report it out for delivery.
+
+   ```bash
+   curl -s -X POST $BASE/orders/$ORDER/status -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"      -H "Idempotency-Key: $(node -e "console.log(crypto.randomUUID())")" -d '{"status":"out_for_delivery"}'
+   ```
+
+   The answer is the order with `"status":"out_for_delivery"`.
+
+3. Report it delivered.
+
+   ```bash
+   curl -s -X POST $BASE/orders/$ORDER/status -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"      -H "Idempotency-Key: $(node -e "console.log(crypto.randomUUID())")" -d '{"status":"delivered"}'
+   ```
+
+   The answer is the order with `"status":"delivered"`, a final status.
+
+The rules:
+
+- `status` is exactly `out_for_delivery` or `delivered`; anything else is `400 invalid_request` with
+  `"field":"status"`.
+- Either is allowed from `accepted`, `preparing`, `ready`, `picked_up` or `served`; `delivered` also from
+  `out_for_delivery`. You need not report `out_for_delivery` first.
+- Sending the status the order already has answers `200` and changes nothing, so a repeat is harmless.
+- A `pending`, `rejected` or `cancelled` order, or `delivered` back to `out_for_delivery`, answers
+  `409 invalid_status_change`; the `message` names the order's current status. Read the order; do not retry.
+- `409 order_changed` means the restaurant changed the order while yours was being handled. Read it and, if the
+  call still makes sense, retry with the same idempotency key.
+- Marking `delivered` an order the restaurant has already been paid for closes its bill at the restaurant.
+
+In code: `client.updateOrderStatus(orderId, 'delivered', newIdempotencyKey())`, and `canReportStatus(current, target)`
+tells you beforehand whether the API will accept it.
 
 ## The accept timeout
 
@@ -158,8 +207,8 @@ number of seconds in its `Retry-After` header. The table for many orders on one 
 
 ## Check it worked
 
-Step 4 printed the same id as step 3, and step 7 answered with `"status":"cancelled"` and
-`"cancelledBy":"partner"`.
+Step 4 printed the same id as step 3, step 7 answered with `"status":"cancelled"` and
+`"cancelledBy":"partner"`, and the second order reads `"status":"delivered"`.
 
 ## Next
 

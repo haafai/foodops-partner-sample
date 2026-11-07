@@ -73,6 +73,16 @@ describe('applyWebhookEvent: order events', () => {
     expect(tracked()?.lastStatus).toBe('cancelled');
   });
 
+  it('moves a picked-up order on to delivered, and then holds it there', () => {
+    track('picked_up', at(30));
+    queryClient.setQueryData(['order', 'order-1'], cachedOrder('picked_up', at(30)));
+    expect(applyWebhookEvent(orderEvent('out_for_delivery', at(40)), queryClient)).toBe('applied');
+    expect(applyWebhookEvent(orderEvent('delivered', at(50)), queryClient)).toBe('applied');
+    expect(order()?.status).toBe('delivered');
+    expect(applyWebhookEvent(orderEvent('out_for_delivery', at(60)), queryClient)).toBe('stale');
+    expect(tracked()?.lastStatus).toBe('delivered');
+  });
+
   it('is harmless when the same events are replayed, in any order', () => {
     track();
     queryClient.setQueryData(['order', 'order-1'], cachedOrder('pending'));

@@ -1,12 +1,16 @@
 import type { PartnerOrder } from '@foodops-partner/client';
 import { statusLabel } from '../orders/statusCopy';
 
-const STEPS = ['pending', 'accepted', 'preparing', 'ready', 'picked_up'];
+const STEPS = ['pending', 'accepted', 'preparing', 'ready', 'picked_up', 'out_for_delivery', 'delivered'];
 
-/** The five steps of an order; one that was rejected or cancelled shows where it started and where it ended. */
+/**
+ * The seven steps of an order; one that was rejected or cancelled shows where it started and where it ended.
+ * `served` (the restaurant's word for handing it over) takes the `picked_up` step's place.
+ */
 export function StatusTimeline({ order }: { order: PartnerOrder }) {
   const stopped = order.status === 'rejected' || order.status === 'cancelled';
-  const steps = stopped ? ['pending', order.status] : STEPS;
+  const steps = stopped ? ['pending', order.status]
+    : order.status === 'served' ? STEPS.map((s) => (s === 'picked_up' ? 'served' : s)) : STEPS;
   const reached = steps.indexOf(order.status);
   const endTone = order.status === 'rejected' ? 'bg-chili text-white' : 'bg-navy text-white';
   return (
