@@ -1,6 +1,6 @@
 # Run the scenarios
 
-At the end of this page you have run the twenty-five scenarios against the mock or a test restaurant and can read
+At the end of this page you have run the twenty-seven scenarios against the mock or a test restaurant and can read
 each pass, skip and fail.
 
 ## Before you start
@@ -34,7 +34,7 @@ set up as you expect. They do not test your own code.
    PASS  webhook.order-event
    PASS  webhook.menu-event
 
-   25 passed, 0 failed, 0 skipped
+   27 passed, 0 failed, 0 skipped
    ```
 
 2. Or put the target in `.env` and leave the flags out.
@@ -105,6 +105,8 @@ port 4010, or the port in the `PORT` environment variable.
 | `order.cancel-pending` | A pending order can be cancelled. | |
 | `order.cancel-twice` | Cancelling a cancelled order answers `200`. | |
 | `order.cancel-after-preparing` | A cancel from `preparing` is `409 cannot_cancel`. | `mock-control` |
+| `order.report-delivery` | An accepted order is reported `out_for_delivery` then `delivered`; repeating `delivered` answers `200`; going back to `out_for_delivery` is `409 invalid_status_change`. | `mock-control` |
+| `order.status-not-allowed` | A status call on a `pending` order is `409 invalid_status_change`, and a status other than `out_for_delivery` or `delivered` is `400 invalid_request`. | |
 | `order.rejected-reason` | A rejection carries the restaurant's reason. | `mock-control` |
 | `order.timeout` | An unanswered order is rejected with reason `timeout`. | `mock-control` |
 | `order.retry-through-faults` | The client's retry gets through a `429` and a `503`. | `mock-control` |

@@ -62,8 +62,12 @@ an order and moved it through its statuses.
    reference `SO-10001`, the status `pending`, and the line "Checking every 5 s."
 
 9. In the "Restaurant simulator (mock only)" box at the bottom, press **Accept**, then **Advance** three times.
-   The status moves through `accepted`, `preparing`, `ready` and `picked_up`, and the polling line changes to
-   "Final status; polling stopped."
+   The status moves through `accepted`, `preparing`, `ready` and `picked_up`. The restaurant's part is done; the
+   order keeps being checked, because your rider has not delivered it yet.
+
+10. Play your rider: press **Out for delivery**, then **Delivered**. These are not the simulator: they send
+    `POST orders/{orderId}/status`, as your own system would. The status moves to `out_for_delivery` and then
+    `delivered`, and the polling line changes to "Final status; polling stopped."
 
 ## Check it worked
 
@@ -73,7 +77,7 @@ Ask the mock what it holds:
 curl -s http://127.0.0.1:4010/_mock/state
 ```
 
-The answer lists your order with `"reference":"SO-10001"` and `"status":"picked_up"`.
+The answer lists your order with `"reference":"SO-10001"` and `"status":"delivered"`.
 
 ## Next
 

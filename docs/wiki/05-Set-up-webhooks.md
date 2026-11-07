@@ -17,7 +17,8 @@ order has arrived, been verified and been recorded.
 ## What to expect from webhooks
 
 - The restaurant's API sends an event when one of your orders changes status and when an outlet's menu changes for
-  you. The event types and their `data` are in [`CONTRACT.md`, Webhooks](../../CONTRACT.md#webhooks).
+  you, including the `out_for_delivery` and `delivered` you report yourself (`order.out_for_delivery`,
+  `order.delivered`). The event types and their `data` are in [`CONTRACT.md`, Webhooks](../../CONTRACT.md#webhooks).
 - **Delivery is one attempt.** There is no retry and no ordering guarantee. An event can be lost, can arrive twice,
   and can arrive after a later one. Keep polling slowly as the backstop.
 - There is **one webhook per restaurant**, not per key.

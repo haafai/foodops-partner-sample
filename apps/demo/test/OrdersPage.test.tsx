@@ -22,7 +22,7 @@ beforeEach(() => localStorage.clear());
 
 describe('OrdersPage', () => {
   it('polls only the non-terminal orders and shows live status on each card', async () => {
-    saveTracked(tracked('done', 'picked_up'));
+    saveTracked(tracked('done', 'delivered'));
     saveTracked(tracked('open', 'pending'));
     const getOrder = vi.fn(async (id: string) => live(id, 'accepted'));
     renderWithProviders(<OrdersPage />, { client: fakeClient({ getOrder }), route: '/orders' });
@@ -30,7 +30,7 @@ describe('OrdersPage', () => {
     expect(await screen.findByText('Accepted')).toHaveAttribute('data-status', 'accepted');
     expect(cardOf('SO-open')).toHaveTextContent('Accepted');
     expect(cardOf('SO-open')).toHaveTextContent('Marine Drive');
-    expect(within(cardOf('SO-done')).getByText('Picked up')).toHaveAttribute('data-status', 'picked_up');
+    expect(within(cardOf('SO-done')).getByText('Delivered')).toHaveAttribute('data-status', 'delivered');
     expect(getOrder).toHaveBeenCalledTimes(1);
     expect(getOrder).toHaveBeenCalledWith('open');
     expect(cardOf('SO-open').querySelector('a')).toHaveAttribute('href', '/orders/open');
@@ -71,12 +71,12 @@ describe('OrdersPage', () => {
 
   it('writes a status reached only on the board back into the store, so polling stops', async () => {
     saveTracked(tracked('open', 'pending'));
-    const getOrder = vi.fn(async () => live('open', 'picked_up'));
+    const getOrder = vi.fn(async () => live('open', 'delivered'));
     renderWithProviders(<OrdersPage />, { client: fakeClient({ getOrder }), route: '/orders' });
     await screen.findByText('SO-open');
-    expect(await screen.findByText('Picked up')).toBeInTheDocument();
-    expect(cardOf('SO-open')).toHaveTextContent('Picked up');
-    await waitFor(() => expect(listTracked().find((o) => o.id === 'open')?.lastStatus).toBe('picked_up'));
+    expect(await screen.findByText('Delivered')).toBeInTheDocument();
+    expect(cardOf('SO-open')).toHaveTextContent('Delivered');
+    await waitFor(() => expect(listTracked().find((o) => o.id === 'open')?.lastStatus).toBe('delivered'));
   });
 
   it('truncates a very long restaurant name and keeps the full name in its title', async () => {

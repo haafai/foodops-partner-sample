@@ -79,6 +79,24 @@ describe('PartnerClient', () => {
     expect(JSON.parse(String(f.calls[1]?.init.body))).toEqual({ reason: 'customer left' });
   });
 
+  it('updateOrderStatus posts the status with the Idempotency-Key to the order', async () => {
+    const f = fakeFetch(() => jsonResponse(200, { id: 'a b', status: 'delivered' }));
+    const client = new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn });
+    const order = await client.updateOrderStatus('a b', 'delivered', 'idem-7');
+    expect(order.status).toBe('delivered');
+    expect(f.calls[0]?.url).toBe(`${BASE}${PARTNER_API_PREFIX}/orders/a%20b/status`);
+    expect(f.calls[0]?.init.method).toBe('POST');
+    expect(f.header(0, 'idempotency-key')).toBe('idem-7');
+    expect(JSON.parse(String(f.calls[0]?.init.body))).toEqual({ status: 'delivered' });
+  });
+
+  it('updateOrderStatus refuses an empty idempotency key before touching the network', async () => {
+    const f = fakeFetch(() => jsonResponse(200, { id: 'x', status: 'delivered' }));
+    const client = new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn });
+    await expect(client.updateOrderStatus('x', 'delivered', '')).rejects.toThrow(TypeError);
+    expect(f.calls).toHaveLength(0);
+  });
+
   it('throws PartnerApiError on any non-2xx, and the key is nowhere in it', async () => {
     const f = fakeFetch(() => jsonResponse(403, { error: 'insufficient_scope', message: 'Missing orders.write' }));
     const client = new PartnerClient({ baseUrl: BASE, apiKey: KEY, fetch: f.fn });

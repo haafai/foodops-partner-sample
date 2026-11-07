@@ -18,18 +18,19 @@ describe('against a target without mock control', () => {
     const skipped = results.filter((r) => r.outcome === 'skipped').map((r) => r.name).sort();
     expect(skipped).toEqual([
       'auth.menu-only-key', 'auth.unbound-key', 'order.cancel-after-preparing', 'order.outlet-closed',
-      'order.rejected-reason', 'order.retry-through-faults', 'order.timeout',
+      'order.rejected-reason', 'order.report-delivery', 'order.retry-through-faults', 'order.timeout',
       'webhook.menu-event', 'webhook.order-event', 'webhook.register',
     ]);
     expect(results.filter((r) => r.outcome === 'fail')).toEqual([]);
   });
 
-  it('lists all 25 names in the documented order', () => {
+  it('lists all 27 names in the documented order', () => {
     expect(ALL_SCENARIOS.map((s) => s.name)).toEqual([
       'outlets.list', 'menu.etag', 'order.create', 'order.idempotent-replay', 'order.idempotency-key-required',
       'order.duplicate-reference', 'order.invalid-line.unknown-variant', 'order.invalid-line.unavailable-variant',
       'order.invalid-line.modifier-over-max', 'order.price-mismatch', 'order.outlet-closed', 'order.foreign-ids',
-      'order.cancel-pending', 'order.cancel-twice', 'order.cancel-after-preparing', 'order.rejected-reason', 'order.timeout',
+      'order.cancel-pending', 'order.cancel-twice', 'order.cancel-after-preparing', 'order.report-delivery',
+      'order.status-not-allowed', 'order.rejected-reason', 'order.timeout',
       'order.retry-through-faults', 'auth.wrong-key', 'auth.menu-only-key', 'auth.unbound-key',
       'webhook.register', 'webhook.invalid-url', 'webhook.order-event', 'webhook.menu-event',
     ]);

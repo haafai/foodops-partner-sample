@@ -10,6 +10,8 @@ export function errorLine(error: PartnerApiError): string {
     case 'duplicate_order': return 'This reference was already used at this restaurant today. Open the existing order.';
     case 'invalid_line': return `Line ${Number(error.details?.line ?? 0) + 1}: ${String(error.details?.reason ?? error.message)}. Refresh the menu and try again.`;
     case 'cannot_cancel': return 'The kitchen has started this order. Call the restaurant.';
+    case 'invalid_status_change': return `${error.message} The order was reloaded.`;
+    case 'order_changed': return 'The restaurant changed this order at the same moment. Try again.';
     case 'idempotency_conflict': return 'This retry key was already used with a different request. Retry with a new key.';
     case 'rate_limited': return `Slow down; retrying in ${error.retryAfterSeconds ?? 5} seconds.`;
     case 'invalid_webhook_url': return 'The restaurant refused that webhook URL. It must be https on a public host, on port 443, with no user name in it.';

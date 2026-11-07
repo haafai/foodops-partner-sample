@@ -7,7 +7,10 @@ const ICONS: Record<string, string | undefined> = {
   accepted: 'M5 12.5l4.5 4.5L19 7.5',
   preparing: 'M4 12h16a8 8 0 0 1-16 0ZM9 8c0-1.5 1.5-1.5 1.5-3M13.5 8c0-1.5 1.5-1.5 1.5-3',
   ready: 'M5 8h14l-1.2 11H6.2ZM9 8V6a3 3 0 0 1 6 0v2',
-  picked_up: 'M3 11.5 12 4l9 7.5M5 10v10h14V10M10 20v-5h4v5',
+  picked_up: 'M6 8h12l-1 12H7ZM9 8a3 3 0 0 1 6 0M9.5 14l2 2 3-3.5',
+  served: 'M4 16h16M6 16a6 6 0 0 1 12 0M12 8v2',
+  out_for_delivery: 'M3 7h11v9H3ZM14 10h4l3 3v3h-7M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
+  delivered: 'M3 11.5 12 4l9 7.5M5 10v10h14V10M10 20v-5h4v5',
   rejected: CROSS,
   cancelled: CROSS,
 };

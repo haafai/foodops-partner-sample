@@ -192,6 +192,21 @@ describe('order events', () => {
     expect(new Set(events().map((ev) => ev.id)).size).toBe(events().length);
   });
 
+  it('raises order.out_for_delivery and order.delivered for the partner\'s own reports, and nothing for a repeat', async () => {
+    await register();
+    const a = await placeOrder();
+    await mock.accept(a.id);
+    const report = (status: string, key: string) =>
+      call(handle, 'POST', `${P}/orders/${a.id}/status`, { body: { status }, headers: { 'idempotency-key': key } });
+    await report('out_for_delivery', 'report-1');
+    await report('delivered', 'report-2');
+    await report('delivered', 'report-3');
+    await settle();
+    const types = events().filter((ev) => ev.data.orderId === a.id).map((ev) => ev.type);
+    expect(types.sort()).toEqual(['order.accepted', 'order.delivered', 'order.out_for_delivery']);
+    expect(events().find((ev) => ev.type === 'order.delivered')!.data).toEqual({ orderId: a.id, partnerReference: a.partnerReference, outletId: OUTLET_MARINE_DRIVE, status: 'delivered' });
+  });
+
   it('sends an order event only to the endpoint of the key that owns the order', async () => {
     await register(['order']);
     const theirs = await placeOrder(SECOND_FULL_KEY);

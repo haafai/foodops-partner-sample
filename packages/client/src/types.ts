@@ -1,4 +1,4 @@
-import type { PartnerOrderStatus } from './status';
+import type { PartnerOrderStatus, PartnerSettableStatus } from './status';
 
 // Every shape below is copied from the partner API contract. Decimals are JSON numbers; times are ISO-8601 UTC.
 
@@ -78,6 +78,7 @@ export interface PartnerOrder {
   totals: PartnerTotals;
 }
 export interface CancelPartnerOrderRequest { reason: string }
+export interface UpdatePartnerOrderStatusRequest { status: PartnerSettableStatus }
 
 /** The two families of events a webhook can subscribe to. */
 export type PartnerWebhookEventName = 'order' | 'menu';

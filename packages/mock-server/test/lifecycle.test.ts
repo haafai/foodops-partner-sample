@@ -75,4 +75,92 @@ describe('POST orders/{id}/cancel', () => {
     expect((await cancel('00000000-0000-4000-8000-000000000000', { reason: 'x' })).status).toBe(404);
     expect((await cancel(id, { reason: 'x' }, idem(), MENU_ONLY_KEY)).status).toBe(403);
   });
+
+  it('a picked-up order can no longer be cancelled by the partner', async () => {
+    const id = await placeOrder();
+    await control(`${id}/accept`);
+    for (let i = 0; i < 3; i++) await control(`${id}/advance`);
+    expect((await cancel(id, { reason: 'late' })).json.error).toBe('cannot_cancel');
+  });
+});
+
+const report = (id: string, body: unknown, key = idem(), apiKey?: string) =>
+  call(handle, 'POST', `${P}/orders/${id}/status`, { body, headers: { 'idempotency-key': key }, key: apiKey });
+
+async function orderAt(steps: number): Promise<string> {
+  const id = await placeOrder();
+  await control(`${id}/accept`);
+  for (let i = 0; i < steps; i++) await control(`${id}/advance`);
+  return id;
+}
+
+describe('POST orders/{id}/status', () => {
+  it('walks an accepted order through out_for_delivery to delivered', async () => {
+    const id = await orderAt(0);
+    const out = await report(id, { status: 'out_for_delivery' });
+    expect(out.status).toBe(200);
+    expect(out.json).toMatchObject({ id, status: 'out_for_delivery' });
+    const done = await report(id, { status: 'delivered' });
+    expect(done.json.status).toBe('delivered');
+    expect((await call(handle, 'GET', `${P}/orders/${id}`)).json.status).toBe('delivered');
+  });
+
+  it('reports delivered straight from picked_up, without out_for_delivery first', async () => {
+    const id = await orderAt(3);
+    expect((await call(handle, 'GET', `${P}/orders/${id}`)).json.status).toBe('picked_up');
+    expect((await report(id, { status: 'delivered' })).json.status).toBe('delivered');
+  });
+
+  it('answers 200 and changes nothing when the order already has the status', async () => {
+    const id = await orderAt(0);
+    const first = await report(id, { status: 'out_for_delivery' });
+    const again = await report(id, { status: 'out_for_delivery' });
+    expect(again.status).toBe(200);
+    expect(again.json.updatedAt).toBe(first.json.updatedAt);
+  });
+
+  it('refuses pending, rejected, cancelled and a step back with 409 invalid_status_change', async () => {
+    const pending = await placeOrder();
+    const rejected = await placeOrder();
+    await control(`${rejected}/reject`, { reason: 'Too busy' });
+    const cancelled = await placeOrder();
+    await cancel(cancelled, { reason: 'gone' });
+    const delivered = await orderAt(1);
+    await report(delivered, { status: 'delivered' });
+
+    for (const [id, target, current] of [
+      [pending, 'out_for_delivery', 'pending'], [rejected, 'delivered', 'rejected'],
+      [cancelled, 'delivered', 'cancelled'], [delivered, 'out_for_delivery', 'delivered'],
+    ] as const) {
+      const r = await report(id, { status: target });
+      expect(r.status).toBe(409);
+      expect(r.json.error).toBe('invalid_status_change');
+      expect(r.json.message).toContain(current);
+      expect((await call(handle, 'GET', `${P}/orders/${id}`)).json.status).toBe(current);
+    }
+  });
+
+  it('400 invalid_request on status for anything but out_for_delivery or delivered', async () => {
+    const id = await orderAt(2);
+    for (const status of ['ready', 'picked_up', 'Delivered', 'out-for-delivery', '', undefined]) {
+      expect((await report(id, { status })).json).toMatchObject({ error: 'invalid_request', field: 'status' });
+    }
+    expect((await call(handle, 'GET', `${P}/orders/${id}`)).json.status).toBe('ready');
+  });
+
+  it('requires an Idempotency-Key, and replays or conflicts on the key', async () => {
+    const id = await orderAt(0);
+    expect((await call(handle, 'POST', `${P}/orders/${id}/status`, { body: { status: 'delivered' } })).json.error).toBe('idempotency_key_required');
+    const key = idem();
+    const a = await report(id, { status: 'out_for_delivery' }, key);
+    const b = await report(id, { status: 'out_for_delivery' }, key);
+    expect(b.json).toEqual(a.json);
+    expect((await report(id, { status: 'delivered' }, key)).json.error).toBe('idempotency_conflict');
+  });
+
+  it('404 for an unknown id; 403 for a menu-only key', async () => {
+    const id = await orderAt(0);
+    expect((await report('00000000-0000-4000-8000-000000000000', { status: 'delivered' })).status).toBe(404);
+    expect((await report(id, { status: 'delivered' }, idem(), MENU_ONLY_KEY)).status).toBe(403);
+  });
 });

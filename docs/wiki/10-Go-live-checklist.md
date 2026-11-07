@@ -22,8 +22,8 @@ you registered one.
 
 ## Retries and idempotency
 
-- [ ] Every `POST orders` and every cancel carries an `Idempotency-Key` minted before the first attempt and stored
-      with the order. ([Place and track an order](04-Place-and-track-an-order.md#idempotency-keys))
+- [ ] Every `POST orders`, every cancel and every status call carries an `Idempotency-Key` minted before the
+      first attempt and stored with the order. ([Place and track an order](04-Place-and-track-an-order.md#idempotency-keys))
 - [ ] A retry sends the same key and the same body.
 - [ ] Only a network failure, a timeout, a `429` or a `5xx` is retried. A `429` waits for `Retry-After`.
 - [ ] Every request has a deadline. The sample client's default is 15 seconds.
@@ -43,7 +43,9 @@ you registered one.
 
 ## Polling backstop
 
-- [ ] Every open order is polled on a timer and polling stops at `picked_up`, `rejected` or `cancelled`.
+- [ ] Every open order is polled on a timer and polling stops at `delivered`, `rejected` or `cancelled`.
+- [ ] Your rider's progress is reported with `POST orders/{orderId}/status` (`out_for_delivery`, then `delivered`), so
+      the restaurant sees it and no order is left at `picked_up`.
       ([Place and track an order](04-Place-and-track-an-order.md#how-often-to-ask-for-the-status))
 - [ ] A `rejected` order with reason `timeout` is handled like any other rejection.
 - [ ] Webhooks: polling is still running, at the slower rate. It is the only thing that recovers a lost event.

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, useParams } from 'react-router-dom';
-import { canCancel, isTerminal, newIdempotencyKey } from '@foodops-partner/client';
+import { canCancel, canReportStatus, isTerminal, newIdempotencyKey } from '@foodops-partner/client';
+import type { PartnerSettableStatus } from '@foodops-partner/client';
 import { ErrorNotice } from '../components/ErrorNotice';
 import { SimulatorPanel } from '../components/SimulatorPanel';
 import { StatusHero } from '../components/StatusHero';
@@ -26,6 +27,12 @@ export function OrderPage() {
   const [cancelKey] = useState(() => newIdempotencyKey());
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<unknown>(null);
+  // One key per status per page visit, for the same reason as the cancel key.
+  const [reportKeys] = useState<Record<PartnerSettableStatus, string>>(() => ({
+    out_for_delivery: newIdempotencyKey(), delivered: newIdempotencyKey(),
+  }));
+  const [reporting, setReporting] = useState(false);
+  const [reportError, setReportError] = useState<unknown>(null);
 
   useEffect(() => {
     if (query.data) updateTracked(orderId, { lastStatus: query.data.status });
@@ -49,6 +56,21 @@ export function OrderPage() {
       await query.refetch();
     } finally {
       setCancelling(false);
+    }
+  }
+
+  async function report(status: PartnerSettableStatus) {
+    if (!client) return;
+    setReporting(true);
+    setReportError(null);
+    try {
+      const updated = await client.updateOrderStatus(orderId, status, reportKeys[status]);
+      queryClient.setQueryData(['order', orderId], updated);
+    } catch (e) {
+      setReportError(e);
+      await query.refetch();
+    } finally {
+      setReporting(false);
     }
   }
 
@@ -87,6 +109,17 @@ export function OrderPage() {
         {!canCancel(order.status) && !isTerminal(order.status) && <span className="w-full text-xs text-muted">The kitchen has started; call the restaurant.</span>}
       </div>
       <ErrorNotice error={cancelError} />
+      <section aria-label="Your rider" className="card flex flex-wrap items-center gap-2 p-4 text-sm">
+        <h2 className="w-full text-lg font-semibold">Your rider</h2>
+        <button type="button" className="btn-ghost" disabled={!canReportStatus(order.status, 'out_for_delivery') || reporting} onClick={() => report('out_for_delivery')}>Out for delivery</button>
+        <button type="button" className="btn-ghost" disabled={!canReportStatus(order.status, 'delivered') || reporting} onClick={() => report('delivered')}>Delivered</button>
+        <span className="w-full text-xs text-muted">
+          {order.status === 'pending' ? 'Available once the restaurant accepts the order.'
+            : isTerminal(order.status) ? 'Nothing left to report.'
+              : 'Tell the restaurant where your rider is.'}
+        </span>
+      </section>
+      <ErrorNotice error={reportError} />
       {mode === 'mock' && <SimulatorPanel orderId={orderId} status={order.status} />}
     </div>
   );

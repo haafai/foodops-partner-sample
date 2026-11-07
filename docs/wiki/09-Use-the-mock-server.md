@@ -99,14 +99,14 @@ simulator" box calls the order routes for you.
 | `GET state` | | Everything the mock holds. |
 | `POST reset` | | Back to the starting state: no orders, no webhooks, original prices, outlet flags, no faults. `204`. |
 | `POST orders/{orderId}/accept` | | `pending` to `accepted`. |
-| `POST orders/{orderId}/advance` | | `accepted` to `preparing` to `ready` to `picked_up`, one step per call. |
+| `POST orders/{orderId}/advance` | | `accepted` to `preparing` to `ready` to `picked_up`, one step per call. Stops there: `out_for_delivery` and `delivered` are your rider's, reported with the API's `POST orders/{orderId}/status`. |
 | `POST orders/{orderId}/reject` | `{"reason":"Too busy"}` | `pending` to `rejected` with that reason. |
 | `POST orders/{orderId}/timeout` | | `pending` to `rejected` with reason `timeout`. |
 | `POST orders/{orderId}/restaurant-cancel` | `{"reason":"Kitchen closed early"}` | Any open order to `cancelled`, `cancelledBy` `restaurant`. |
 | `PUT prices` | `{"variantId":"…","price":99}` | Sets that variant's price. `204`. |
 | `PUT outlets/{outletId}` | `{"open":false}` or `{"acceptingOnline":false}` | Closes the till, or pauses online ordering. `204`. |
 | `POST faults` | `{"responses":[{"status":429,"retryAfterSeconds":2},{"status":503}]}` | The next API calls answer these, one each, in order. `204`. |
-| `PUT autopilot` | `{"enabled":true,"stepSeconds":5}` | New orders are accepted after one step and advance one status per step. `204`. |
+| `PUT autopilot` | `{"enabled":true,"stepSeconds":5}` | New orders are accepted after one step and advance one status per step, up to `picked_up`. `204`. |
 
 A status change the order cannot make answers `409` with the mock-only code `invalid_transition`, for example
 `{"error":"invalid_transition","message":"Cannot go from rejected to rejected."}`.
@@ -126,6 +126,7 @@ other status from 400 to 599 is answered as plain text, which is how a failing p
 | Webhook owner | One webhook per key. | One per restaurant and delivery partner, shared by all your keys there. |
 | Order visibility and duplicates | Per key: the second full-access key cannot see the first key's orders. | The contract says "visible to this key" and does not say more. Ask the restaurant how two of your keys relate. |
 | Outlet-restricted keys | None exist, so `403 outlet_restricted_key` never happens. | A restricted key cannot register a webhook. |
+| Restaurant-side delivery steps | The simulated restaurant never sets `served`, `out_for_delivery` or `delivered`; only your `POST orders/{orderId}/status` does. | The restaurant can set any of them too. |
 | Accept timeout | Never fires by itself. Use `POST orders/{orderId}/timeout`. | Fires after `acceptTimeoutMinutes`. |
 | Limits | No rate limit, no quota, no IP allow-list. `429` and `503` appear only when you queue them. | `429 rate_limited`, `402 quota_exceeded`, `403 ip_not_allowed`. |
 | Codes never produced | `endpoint_not_available`, `outlet_not_configured`, and the delivery outcome `blocked_address`. | All can occur. |

@@ -1,5 +1,5 @@
-import { canCancel, isTerminal } from '@foodops-partner/client';
-import type { PartnerOrderStatus } from '@foodops-partner/client';
+import { PARTNER_SETTABLE_STATUSES, canCancel, canReportStatus, isTerminal } from '@foodops-partner/client';
+import type { PartnerOrderStatus, PartnerSettableStatus } from '@foodops-partner/client';
 import type { MockKey } from './fixtures';
 import { error, json } from './http';
 import type { JsonResponse } from './http';
@@ -80,7 +80,36 @@ export function handlePartnerCancel(state: MockState, key: MockKey, orderId: str
   return response;
 }
 
-/** With autopilot on, the restaurant accepts after one step and advances one status per step until picked up. */
+const isSettable = (v: unknown): v is PartnerSettableStatus => (PARTNER_SETTABLE_STATUSES as readonly unknown[]).includes(v);
+
+/**
+ * The contract's partner status report: `out_for_delivery` or `delivered`, once the restaurant has accepted the
+ * order, never backwards. The status the order already has answers 200 and changes nothing (no event).
+ */
+export function handlePartnerStatus(state: MockState, key: MockKey, orderId: string, body: unknown, idempotencyKey: string): JsonResponse {
+  const replay = state.replay(key.keyId, idempotencyKey, body);
+  if (replay) return replay;
+  if (!isObj(body) || !isSettable(body.status)) {
+    return error(400, 'invalid_request', 'status must be "out_for_delivery" or "delivered".', { field: 'status' });
+  }
+  const target = body.status;
+  const order = findVisibleOrder(state, key, orderId);
+  if (!order) return error(404, 'not_found', 'No order with that id is visible to this key.');
+  if (order.status !== target) {
+    if (!canReportStatus(order.status, target)) {
+      return error(409, 'invalid_status_change', `This order is ${order.status}, so it cannot be marked ${target}.`);
+    }
+    stamp(state, order, { status: target });
+  }
+  const response = json(200, toOrderDto(order));
+  state.remember(key.keyId, idempotencyKey, body, response);
+  return response;
+}
+
+/**
+ * With autopilot on, the restaurant accepts after one step and advances one status per step until it hands the
+ * order over (picked_up). The rider's steps after that are the partner's to report, so the autopilot stops there.
+ */
 export function scheduleAutopilot(state: MockState, orderId: string): void {
   if (!state.autopilot.enabled) return;
   const arm = (): void => {
@@ -90,9 +119,10 @@ export function scheduleAutopilot(state: MockState, orderId: string): void {
     const order = state.orders.get(orderId);
     if (!order || isTerminal(order.status)) return;
     if (order.status === 'pending') acceptOrder(state, orderId);
-    else advanceOrder(state, orderId);
+    else if (NEXT[order.status]) advanceOrder(state, orderId);
     const after = state.orders.get(orderId);
-    if (after && !isTerminal(after.status)) arm();
+    if (after && !isTerminal(after.status) && (after.status === 'pending' || NEXT[after.status])) arm();
+    else state.timers.delete(orderId);
   };
   arm();
 }

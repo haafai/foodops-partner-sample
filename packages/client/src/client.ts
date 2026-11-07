@@ -1,8 +1,9 @@
 import { MissingIdempotencyKeyError, PartnerTimeoutError, errorFromResponse } from './errors';
 import type {
   CreatePartnerOrderRequest, PartnerMenu, PartnerOrder, PartnerOrderCreated, PartnerOutlet, PartnerWebhook, PartnerWebhookEventName,
-  PartnerWebhookRegistration, SetPartnerWebhookRequest,
+  PartnerWebhookRegistration, SetPartnerWebhookRequest, UpdatePartnerOrderStatusRequest,
 } from './types';
+import type { PartnerSettableStatus } from './status';
 
 export const PARTNER_API_PREFIX = '/api/external/v1/partner';
 
@@ -34,7 +35,7 @@ function requireIdempotencyKey(key: string): void {
   }
 }
 
-/** The eight partner calls. Every non-2xx answer throws a PartnerApiError, except the 404 of `getWebhook`. */
+/** The nine partner calls. Every non-2xx answer throws a PartnerApiError, except the 404 of `getWebhook`. */
 export class PartnerClient {
   readonly #baseUrl: string;
   readonly #apiKey: string;
@@ -80,6 +81,19 @@ export class PartnerClient {
     requireIdempotencyKey(idempotencyKey);
     return this.#json<PartnerOrder>('POST', `orders/${encodeURIComponent(orderId)}/cancel`, {
       body: { reason }, headers: { 'Idempotency-Key': idempotencyKey },
+    });
+  }
+
+  /**
+   * Report your rider's progress: `out_for_delivery` or `delivered`, once the restaurant has accepted the order.
+   * The answer is the order as it now stands. Reporting the status it already has answers 200 and changes
+   * nothing; a pending, rejected or cancelled order, or a step back, is 409 `invalid_status_change`.
+   */
+  async updateOrderStatus(orderId: string, status: PartnerSettableStatus, idempotencyKey: string): Promise<PartnerOrder> {
+    requireIdempotencyKey(idempotencyKey);
+    const body: UpdatePartnerOrderStatusRequest = { status };
+    return this.#json<PartnerOrder>('POST', `orders/${encodeURIComponent(orderId)}/status`, {
+      body, headers: { 'Idempotency-Key': idempotencyKey },
     });
   }
 
